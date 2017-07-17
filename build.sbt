@@ -13,8 +13,15 @@ val fs2CatsVersion = "0.3.0"
 val slf4jVersion = "1.7.21"
 val configVersion = "1.1.0"
 val enumeratumVersion = "1.5.12"
+val doobieVersion = "0.4.1"
 
 val flyway = Seq("org.flywaydb" % "flyway-core" % "4.0.3")
+
+val doobie = Seq(
+  "org.tpolecat" %% "doobie-core-cats" % doobieVersion,
+  "org.tpolecat" %% "doobie-postgres-cats" % doobieVersion,
+  "org.tpolecat" %% "doobie-hikari-cats" % doobieVersion
+)
 
 val cats = Seq("org.typelevel" %% "cats" % catsVersion)
 
