@@ -9,7 +9,13 @@ trait JobsStore {
   def getRunningJobs: Task[List[RunningJobInstance]]
   def getFinishedJobs: Task[List[FinishedJobInstance]]
 
-  def queueJob(queuedJob: QueuedJobInstance): Task[Boolean]
-  def runJob(runningJob: RunningJobInstance): Task[Boolean]
-  def finishJob(finishedJobInstance: FinishedJobInstance): Task[Unit]
+  def createQueuedJob(queuedJob: QueuedJobInstance): Task[Unit]
+  // def createRunningJob(runningJob: RunningJobInstance): Task[Unit]
+  // def createFinishedJob(finishedJob: FinishedJobInstance): Task[Unit]
+
+  def moveQueuedJobToRunningJob(runningJob: RunningJobInstance): Task[Unit]
+
+  def moveRunningJobToQueuedJob(queuedJob: QueuedJobInstance): Task[Unit]
+  def moveRunningJobToFinishedJob(finishedJob: FinishedJobInstance): Task[Unit]
+
 }

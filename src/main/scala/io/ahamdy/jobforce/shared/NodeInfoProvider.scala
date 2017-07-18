@@ -1,8 +1,8 @@
 package io.ahamdy.jobforce.shared
 
-import io.ahamdy.jobforce.domain.{NodeGroupId, NodeId}
+import io.ahamdy.jobforce.domain.{NodeGroup, NodeId}
 
 trait NodeInfoProvider {
   def nodeId: NodeId
-  def nodeGroupId: NodeGroupId
+  def nodeGroup: NodeGroup
 }
