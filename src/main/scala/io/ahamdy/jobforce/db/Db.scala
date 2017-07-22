@@ -26,16 +26,16 @@ object Db {
     new DbImpl(transactor)
   }
 
-  def createDataSource(config: DbConfig): DataSource = {
-    val dataSource = new PGSimpleDataSource
-    dataSource.setServerName(config.hostname)
-    dataSource.setPortNumber(config.port)
-    dataSource.setDatabaseName(config.databaseName)
-    dataSource.setUser(config.username)
-    dataSource.setPassword(config.password)
-    dataSource.setApplicationName("PSA")
-    dataSource
-  }
+  def createDataSource(config: DbConfig): DataSource =
+    new PGSimpleDataSource {
+      setServerName(config.hostname)
+      setPortNumber(config.port)
+      setDatabaseName(config.databaseName)
+      setUser(config.username)
+      setPassword(config.password)
+      setApplicationName("PSA")
+    }
+
 
   def migrateSchema(dataSource: DataSource): Unit =
     new Flyway() {

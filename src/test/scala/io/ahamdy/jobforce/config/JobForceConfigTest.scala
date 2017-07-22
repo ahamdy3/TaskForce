@@ -1,8 +1,9 @@
 package io.ahamdy.jobforce.config
 
-import io.ahamdy.jobforce.testing.StandardSpec
+import org.specs2.Specification
 
-class JobForceConfigSpec extends StandardSpec { def is = s2"""
+
+class JobForceConfigTest extends Specification { def is = s2"""
   Environment configs can be loaded:
     application-test:      ${testEnv("application-test.conf")}
     """

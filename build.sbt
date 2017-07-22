@@ -58,8 +58,8 @@ val scalacheckCats = Seq("io.github.amrhassan" %% "scalacheck-cats" % scalacheck
 
 
 val deps =
-// doobie ++
-  flyway ++
+  doobie ++
+    flyway ++
     specs2 ++
     embeddedPostgres ++
     scalaCheck ++

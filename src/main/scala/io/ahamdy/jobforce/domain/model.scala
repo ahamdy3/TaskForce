@@ -35,8 +35,11 @@ case class RunningJobInstance(jobId: JobId, nodeId: NodeId, jobLock: JobLock, jo
                               jobWeight: JobWeight, jobData: Map[String, String], jobAttempts: JobAttempts,
                               queuingTime: ZonedDateTime, startTime: ZonedDateTime,
                               parentJob: Option[JobId]) extends JobInstance {
-  def toQueuedJobInstance =
-    QueuedJobInstance(jobId, jobLock, jobType, jobWeight, jobData, jobAttempts, queuingTime, parentJob)
+  def toQueuedJobInstance(newQueuingTime: ZonedDateTime): QueuedJobInstance =
+    QueuedJobInstance(jobId, jobLock, jobType, jobWeight, jobData, jobAttempts, newQueuingTime, parentJob)
+  def toFinishedJobInstance(finishTime: ZonedDateTime): FinishedJobInstance =
+    FinishedJobInstance(jobId, nodeId, jobLock, jobType, jobWeight, jobData, jobAttempts.incAttempts, queuingTime,
+      startTime, finishTime, parentJob)
 }
 
 case class FinishedJobInstance(jobId: JobId, nodeId: NodeId, jobLock: JobLock, jobType: JobType,

@@ -6,18 +6,18 @@ import com.typesafe.scalalogging.StrictLogging
 import fs2._
 
 trait Logging extends StrictLogging{
-  def logDebug[A: Show](a: A): Task[Unit] =
-    Task.delay(logger.debug(a.show))
+  def logDebug(msg: String): Task[Unit] =
+    Task.delay(logger.debug(msg))
 
-  def logError[A: Show](a: A): Task[Unit] =
-    Task.delay(logger.error(a.show))
+  def logError(msg: String): Task[Unit] =
+    Task.delay(logger.error(msg))
 
-  def logInfo[A: Show](a: A): Task[Unit] =
-    Task.delay(logger.info(a.show))
+  def logInfo(msg: String): Task[Unit] =
+    Task.delay(logger.info(msg))
 
-  def logWarning[A: Show](a: A): Task[Unit] =
-    Task.delay(logger.warn(a.show))
+  def logWarning(msg: String): Task[Unit] =
+    Task.delay(logger.warn(msg))
 
-  def logTrace[A: Show](a: A): Task[Unit] =
-    Task.delay(logger.trace(a.show))
+  def logTrace(msg: String): Task[Unit] =
+    Task.delay(logger.trace(msg))
 }
