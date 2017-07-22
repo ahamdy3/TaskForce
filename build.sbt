@@ -14,6 +14,7 @@ val slf4jVersion = "1.7.21"
 val configVersion = "1.1.0"
 val enumeratumVersion = "1.5.12"
 val doobieVersion = "0.4.1"
+val cronUtilsVersion = "5.0.5"
 
 val flyway = Seq("org.flywaydb" % "flyway-core" % "4.0.3")
 
@@ -41,10 +42,9 @@ val logging = Seq(
 
 val enumeratum = Seq("com.beachape" %% "enumeratum" % enumeratumVersion)
 
-val scalaCheck = Seq(
-  "org.scalacheck" %% "scalacheck" % scalacheckVersion % "test",
-  "io.github.amrhassan" %% "scalacheck-cats" % scalacheckCatsVersion % "test"
-)
+val cronUtils = Seq("com.cronutils" % "cron-utils" % cronUtilsVersion)
+
+val scalaCheck = Seq("org.scalacheck" %% "scalacheck" % scalacheckVersion % "test")
 val specs2 = Seq(
   "specs2-core",
   "specs2-scalacheck",
@@ -53,8 +53,6 @@ val specs2 = Seq(
 ).map("org.specs2" %% _ % specs2Version % "test")
 
 val embeddedPostgres = Seq("com.opentable.components" % "otj-pg-embedded" % "0.7.1" % "test")
-
-val scalacheckCats = Seq("io.github.amrhassan" %% "scalacheck-cats" % scalacheckCatsVersion % Provided)
 
 
 val deps =
@@ -68,8 +66,7 @@ val deps =
     // circe ++
     fs2 ++
     specs2 ++
-    scalacheckCats ++
-    //    cronUtils ++
+    cronUtils ++
     logging ++
     configLib
 

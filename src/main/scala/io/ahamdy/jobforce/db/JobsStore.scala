@@ -1,21 +1,25 @@
 package io.ahamdy.jobforce.db
 
+import java.time.ZonedDateTime
+
 import fs2.Task
-import io.ahamdy.jobforce.domain.{FinishedJobInstance, QueuedJobInstance, RunningJobInstance}
+import io.ahamdy.jobforce.domain.{FinishedJob, JobLock, QueuedJob, RunningJob}
 
 
 trait JobsStore {
-  def getQueuedJobs: Task[List[QueuedJobInstance]]
-  def getRunningJobs: Task[List[RunningJobInstance]]
-  def getFinishedJobs: Task[List[FinishedJobInstance]]
+  def getQueuedJobs: Task[List[QueuedJob]]
+  def getRunningJobs: Task[List[RunningJob]]
+  def getFinishedJobs: Task[List[FinishedJob]]
 
-  def createQueuedJob(queuedJob: QueuedJobInstance): Task[Boolean]
+  def createQueuedJob(queuedJob: QueuedJob): Task[Boolean]
   // def createRunningJob(runningJob: RunningJobInstance): Task[Unit]
   // def createFinishedJob(finishedJob: FinishedJobInstance): Task[Unit]
 
-  def moveQueuedJobToRunningJob(runningJob: RunningJobInstance): Task[Unit]
+  def moveQueuedJobToRunningJob(runningJob: RunningJob): Task[Unit]
 
-  def moveRunningJobToQueuedJob(queuedJob: QueuedJobInstance): Task[Unit]
-  def moveRunningJobToFinishedJob(finishedJob: FinishedJobInstance): Task[Unit]
+  def moveRunningJobToQueuedJob(queuedJob: QueuedJob): Task[Unit]
+  def moveRunningJobToFinishedJob(finishedJob: FinishedJob): Task[Unit]
+
+  def getJobLastRunTime(lock: JobLock): Task[Option[ZonedDateTime]]
 
 }
