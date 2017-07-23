@@ -3,6 +3,10 @@ package io.ahamdy.jobforce
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
+import fs2.Task
+import cats.syntax.functor._
+import fs2.interop.cats._
+
 import scala.concurrent.duration._
 
 package object syntax {
@@ -17,5 +21,8 @@ package object syntax {
     def isBetween(olderTime: ZonedDateTime, newerTime: ZonedDateTime): Boolean =
       zonedDateTime.isAfter(olderTime) && zonedDateTime.isBefore(newerTime)
   }
+
+  def sequenceUnit[A](input: List[Task[A]]): Task[Unit] =
+    Task.traverse(input)(identity).map(_.toList).as(())
 }
 

@@ -38,11 +38,11 @@ trait LeaderDuties {
 class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoProvider, jobsScheduleProvider: JobsScheduleProvider,
                        currentNodesStore: CurrentNodesStore, jobsStore: JobsStore, time: Time)
   extends LeaderDuties with Logging {
-  val startTime = time.unsafeNow()
+  val startTime: ZonedDateTime = time.unsafeNow()
   val leaderFlag = new AtomicBoolean(false)
-  var jobsSchedule: List[ScheduledJob] = List.empty
   val queuedJobs = new ConcurrentHashMap[JobId, QueuedJob]
   val runningJobs = new ConcurrentHashMap[JobLock, RunningJob]
+  private var jobsSchedule: List[ScheduledJob] = List.empty
 
   override def isLeader: Boolean = leaderFlag.get()
 
@@ -76,22 +76,23 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
     }
 
   override def queueScheduledJobs: Task[Unit] = onlyIfLeader {
-    jobsSchedule.map(queueScheduledJob).sequence.map(_ => ())
+    sequenceUnit(jobsSchedule.map(queueScheduledJob))
   }
 
   override def assignQueuedJobs: Task[Unit] = onlyIfLeader {
-    queuedJobs.values().asScala.toList.map(assignJob).sequence.map(_ => ())
+    sequenceUnit(queuedJobs.values().asScala.toList.map(assignJob))
   }
 
   private def queueScheduledJob(job: ScheduledJob): Task[Unit] =
-    for {
-      now <- time.now
-      lastRunTime <- jobsStore.getJobLastRunTime(job.lock).map(_.getOrElse(startTime))
-      if isDue(job, now, lastRunTime)
-      queuedJob = job.toQueuedJob(JobId.generateNew, now)
-      _ <- Task.delay(queuedJobs.putIfAbsent(queuedJob.id, queuedJob))
-      _ <- jobsStore.createQueuedJob(queuedJob)
-    } yield ()
+    time.now.flatMap{ now =>
+      jobsStore.getJobLastRunTime(job.lock).map(_.getOrElse(startTime)).flatMap{
+        case lastRunTime if isDue(job, now, lastRunTime) =>
+          val queuedJob = job.toQueuedJob(JobId.generateNew, now)
+          Task.delay(queuedJobs.putIfAbsent(queuedJob.id, queuedJob)) >>
+            jobsStore.createQueuedJob(queuedJob).as(())
+        case _ => Task.now(())
+      }
+    }
 
   private def isDue(scheduledJob: ScheduledJob, now: ZonedDateTime, lastRunTime: ZonedDateTime): Boolean =
     scheduledJob.schedule.cronLine.nextExecutionTimeAfter(lastRunTime)
@@ -111,7 +112,7 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
     }
 
 
-  override def cleanJobs(): Task[Unit] =
+  override def cleanJobs: Task[Unit] =
     onlyIfLeader {
       currentNodesStore.getAllNodes.map { allNodes =>
         val allNodesSet = allNodes.map(_.nodeId).toSet

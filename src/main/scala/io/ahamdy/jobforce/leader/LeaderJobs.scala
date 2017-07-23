@@ -13,7 +13,7 @@ trait LeaderJobs {
 
 class LeaderJobsImpl(config: LeaderJobsConfig, leaderDuties: LeaderDuties) extends LeaderJobs with Logging {
 
-  override val scheduler: Scheduler = new SchedulerImpl(SchedulerConfig(threadPoolSize = 6))
+  override val scheduler: Scheduler = new SchedulerImpl(SchedulerConfig(threadPoolSize = 7))
 
   override def start(): Unit = {
     scheduler.unsafeSchedule(config.leaderElectionPeriod, leaderDuties.electClusterLeader, resultHandler)

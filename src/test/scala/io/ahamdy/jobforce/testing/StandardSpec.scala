@@ -6,5 +6,6 @@ import org.specs2.mutable.Specification
 
 trait StandardSpec extends Specification
   with ScalaCheck
+  with TaskMatchers
   with TerminationMatchers
   with ThrownExpectations
