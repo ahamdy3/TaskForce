@@ -18,6 +18,13 @@ case class JobType(value: String) extends AnyVal
 case class JobWeight(value: Int) extends AnyVal
 case class JobPriority(value: Int) extends AnyVal
 case class JobSchedule(cronLine: CronLine, startTimeWindow: FiniteDuration)
+case class JobResult(value: String) extends AnyVal
+case class JobResultMessage(value: String) extends AnyVal
+
+object JobResult {
+  val SUCCESS = JobResult("SUCCESS")
+  val FAILURE = JobResult("FAILURE")
+}
 
 case class JobAttempts(attempts: Int, maxAttempts: Int) {
   def incAttempts: JobAttempts = JobAttempts(attempts +1, maxAttempts)
@@ -52,7 +59,7 @@ case class ScheduledJob(lock: JobLock, jobType: JobType, weight: JobWeight, data
 case class QueuedJob(id: JobId, lock: JobLock, jobType: JobType, weight: JobWeight, data: Map[String, String],
                      attempts: JobAttempts, priority: JobPriority, queuingTime: ZonedDateTime,
                      parentJob: Option[JobId]) extends JobInstance {
-  def toRunningJob(nodeId: NodeId, startTime: ZonedDateTime): RunningJob =
+  def toRunningJobAndIncAttempts(nodeId: NodeId, startTime: ZonedDateTime): RunningJob =
     RunningJob(id, nodeId, lock, jobType, weight, data, attempts.incAttempts, priority, queuingTime,
       startTime, parentJob)
 }
@@ -63,15 +70,18 @@ case class RunningJob(id: JobId, nodeId: NodeId, lock: JobLock, jobType: JobType
                       parentJob: Option[JobId]) extends JobInstance {
   def toQueuedJob(newQueuingTime: ZonedDateTime): QueuedJob =
     QueuedJob(id, lock, jobType, weight, data, attempts, priority, newQueuingTime, parentJob)
-  def toFinishedJob(finishTime: ZonedDateTime): FinishedJob =
+  def toFinishedJob(finishTime: ZonedDateTime, result: JobResult, resultMessage: Option[JobResultMessage] = None): FinishedJob =
     FinishedJob(id, nodeId, lock, jobType, weight, data, attempts, priority, queuingTime,
-      startTime, finishTime, parentJob)
+      startTime, finishTime, parentJob, result, resultMessage)
 }
 
 case class FinishedJob(id: JobId, nodeId: NodeId, lock: JobLock, jobType: JobType,
                        weight: JobWeight, data: Map[String, String], attempts: JobAttempts, priority: JobPriority,
                        queuingTime: ZonedDateTime, startTime: ZonedDateTime, finishTime: ZonedDateTime,
-                       parentJob: Option[JobId]) extends JobInstance
+                       parentJob: Option[JobId], result: JobResult, resultMessage: Option[JobResultMessage]) extends JobInstance
 
 case class JobNode(nodeId: NodeId, nodeGroup: NodeGroup, startTime: ZonedDateTime, active: NodeActive, version: NodeVersion)
 case class NodeLoad(node: JobNode, jobsWeight: Int)
+
+case class JobDataValidationException(msg: String) extends Exception(msg)
+case class RegisterError(jobType: JobType, message: String)

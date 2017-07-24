@@ -23,6 +23,6 @@ package object syntax {
   }
 
   def sequenceUnit[A](input: List[Task[A]]): Task[Unit] =
-    Task.traverse(input)(identity).map(_.toList).as(())
+    Task.parallelTraverse(input)(identity).map(_.toList).as(())
 }
 

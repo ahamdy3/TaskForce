@@ -3,12 +3,13 @@ package io.ahamdy.jobforce.db
 import java.time.ZonedDateTime
 
 import fs2.Task
-import io.ahamdy.jobforce.domain.{FinishedJob, JobLock, QueuedJob, RunningJob}
+import io.ahamdy.jobforce.domain._
 
 
 trait JobsStore {
   def getQueuedJobs: Task[List[QueuedJob]]
   def getRunningJobs: Task[List[RunningJob]]
+  def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]]
   def getFinishedJobs: Task[List[FinishedJob]]
 
   def createQueuedJob(queuedJob: QueuedJob): Task[Boolean]
