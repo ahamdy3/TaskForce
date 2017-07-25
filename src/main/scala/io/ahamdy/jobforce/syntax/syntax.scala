@@ -3,7 +3,7 @@ package io.ahamdy.jobforce
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
-import fs2.Task
+import fs2.{Strategy, Task}
 import cats.syntax.functor._
 import fs2.interop.cats._
 
@@ -23,6 +23,9 @@ package object syntax {
   }
 
   def sequenceUnit[A](input: List[Task[A]]): Task[Unit] =
+    Task.traverse(input)(identity).map(_.toList).as(())
+
+  def parallelSequenceUnit[A](input: List[Task[A]])(implicit S: Strategy): Task[Unit] =
     Task.parallelTraverse(input)(identity).map(_.toList).as(())
 }
 

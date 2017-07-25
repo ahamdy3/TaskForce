@@ -22,5 +22,4 @@ trait JobsStore {
   def moveRunningJobToFinishedJob(finishedJob: FinishedJob): Task[Unit]
 
   def getJobLastRunTime(lock: JobLock): Task[Option[ZonedDateTime]]
-
 }

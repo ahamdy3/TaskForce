@@ -7,16 +7,16 @@ import cats.syntax.flatMap._
 import fs2.interop.cats._
 import fs2.Task
 import io.ahamdy.jobforce.common.{Logging, Time}
-import io.ahamdy.jobforce.db.JobsStore
+import io.ahamdy.jobforce.db.{JobsStore, NodeStore}
 import io.ahamdy.jobforce.domain._
 import io.ahamdy.jobforce.shared.NodeInfoProvider
 import io.ahamdy.jobforce.syntax._
 
-trait WorkerApi {
+trait UserApi {
   def queueJob(queuedJob: QueuedJob): Task[Boolean]
 }
 
-trait WorkerDuties extends WorkerApi {
+trait WorkerDuties extends UserApi {
   def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): Task[Unit]
 
   def finishJob(finishedJob: FinishedJob): Task[Unit]
@@ -24,10 +24,12 @@ trait WorkerDuties extends WorkerApi {
   def runAssignedJobs: Task[Unit]
 
   def localRunningJobs: ConcurrentHashMap[JobId, RunningJob]
+
+  def signalHeartbeat: Task[Unit]
 }
 
 class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInfoProvider: NodeInfoProvider,
-                       jobHandlerRegister: JobHandlerRegister, time: Time)
+                       nodeStore: NodeStore, jobHandlerRegister: JobHandlerRegister, time: Time)
   extends WorkerDuties with Logging {
 
   val localRunningJobs = new ConcurrentHashMap[JobId, RunningJob]()
@@ -52,7 +54,7 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInf
 
   override def runAssignedJobs: Task[Unit] =
     jobsStore.getRunningJobsByNodeId(nodeInfoProvider.nodeId).flatMap { jobs =>
-      sequenceUnit(jobs.map(runAssignedJob))
+      parallelSequenceUnit(jobs.map(runAssignedJob))
     }
 
   def runAssignedJob(runningJob: RunningJob): Task[Unit] =
@@ -85,6 +87,8 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInf
     }
   }
 
+  override def signalHeartbeat: Task[Unit] =
+    nodeStore.updateHeartbeat(nodeInfoProvider.nodeGroup, nodeInfoProvider.nodeId)
 }
 
 case class WorkerDutiesConfig()

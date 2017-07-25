@@ -20,7 +20,7 @@ class LeaderJobsImpl(config: LeaderJobsConfig, leaderDuties: LeaderDuties) exten
     scheduler.unsafeSchedule(config.refreshJobsSchedulePeriod, leaderDuties.refreshJobsSchedule, resultHandler)
     scheduler.unsafeSchedule(config.refreshQueuedJobsPeriod, leaderDuties.refreshQueuedJobs, resultHandler)
     scheduler.unsafeSchedule(config.assignQueuedJobsPeriod, leaderDuties.assignQueuedJobs, resultHandler)
-    scheduler.unsafeSchedule(config.cleanJobsPeriod, leaderDuties.cleanJobs, resultHandler)
+    scheduler.unsafeSchedule(config.cleanJobsPeriod, leaderDuties.cleanDeadNodesJobs(), resultHandler)
     scheduler.unsafeSchedule(config.queueScheduleJobsPeriod, leaderDuties.queueScheduledJobs, resultHandler)
     // scheduler.unsafeSchedule(config.scaleClusterPeriod, leaderDuties.scaleCluster, resultHandler)
   }

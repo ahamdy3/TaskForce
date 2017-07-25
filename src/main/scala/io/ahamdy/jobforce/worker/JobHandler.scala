@@ -14,7 +14,7 @@ trait JobHandler {
     */
   def validateJobInput(data: Map[String, String]): Task[Map[String, String]]
 
-  def jobHandlerFunction(validData: Map[String, String], worker: WorkerApi): Task[Unit]
+  def jobHandlerFunction(validData: Map[String, String], worker: UserApi): Task[Unit]
 
   def errorHandler: PartialFunction[Throwable, Task[Unit]]
 
