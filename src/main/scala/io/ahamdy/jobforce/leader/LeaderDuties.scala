@@ -25,8 +25,6 @@ trait LeaderDuties {
   def refreshJobsSchedule: Task[Unit]
   def queueScheduledJobs: Task[Unit]
   def assignQueuedJobs: Task[Unit]
-//  def cleanJob(runningJob: RunningJob): Task[Unit]
-//  def cleanJobs(runningJob: List[RunningJob]): Task[Unit]
   def cleanDeadNodesJobs(ignoreLeader: Boolean = false): Task[Unit]
   def scaleCluster: Task[Unit]
 }
