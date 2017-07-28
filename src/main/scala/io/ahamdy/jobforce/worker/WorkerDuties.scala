@@ -7,9 +7,9 @@ import cats.syntax.flatMap._
 import fs2.interop.cats._
 import fs2.Task
 import io.ahamdy.jobforce.common.{Logging, Time}
-import io.ahamdy.jobforce.db.{JobsStore, NodeStore}
 import io.ahamdy.jobforce.domain._
 import io.ahamdy.jobforce.shared.NodeInfoProvider
+import io.ahamdy.jobforce.store.{JobsStore, NodeStore}
 import io.ahamdy.jobforce.syntax._
 
 trait UserApi {
@@ -46,7 +46,7 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInf
     else
       for {
         now <- time.now
-        _ <- finishJob(runningJob.toFinishedJob(now, JobResult.FAILURE, resultMessage))
+        _ <- finishJob(runningJob.toFinishedJob(now, JobResult.Failure, resultMessage))
       } yield ()
 
   override def finishJob(finishedJob: FinishedJob): Task[Unit] =
@@ -70,7 +70,7 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInf
       validData <- runValidation(jobHandler, job)
       _ <- jobHandler.jobHandlerFunction(validData, this).attempt.map(_.leftMap(jobHandler.errorHandler)).attempt
       finishTime <- time.now
-      _ <- finishJob(job.toFinishedJob(finishTime, JobResult.SUCCESS))
+      _ <- finishJob(job.toFinishedJob(finishTime, JobResult.Success))
     } yield ()
   }
 
@@ -79,7 +79,7 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInf
       case Right(validData) => Task.now(validData)
       case Left(e: JobDataValidationException) =>
         time.now.flatMap { now =>
-          finishJob(job.toFinishedJob(now, JobResult.FAILURE,
+          finishJob(job.toFinishedJob(now, JobResult.Failure,
             Some(JobResultMessage(s"Job data validation error: ${e.msg}")))) >>
             Task.fail(e)
         }

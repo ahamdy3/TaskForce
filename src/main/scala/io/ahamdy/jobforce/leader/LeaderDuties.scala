@@ -9,10 +9,10 @@ import fs2.interop.cats._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import io.ahamdy.jobforce.common.{Logging, Time}
-import io.ahamdy.jobforce.db.{NodeStore, JobsStore}
 import io.ahamdy.jobforce.domain._
 import io.ahamdy.jobforce.scheduling.JobsScheduleProvider
 import io.ahamdy.jobforce.shared.NodeInfoProvider
+import io.ahamdy.jobforce.store.{JobsStore, NodeStore}
 import io.ahamdy.jobforce.syntax._
 
 import scala.collection.JavaConverters._
@@ -47,7 +47,7 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
         case node if node.nodeId == nodeInfoProvider.nodeId && node.startTime.minus(now) < config.youngestLeaderAge =>
           logInfo(s"Oldest node still too young to be a leader, current age: ${node.startTime.minus(now)}, leader must be older than ${config.youngestLeaderAge}")
         case node if node.nodeId == nodeInfoProvider.nodeId =>
-          jobsStore.getQueuedJobs.map(jobsList =>
+          jobsStore.getQueuedJobsOrderedByPriority.map(jobsList =>
             queuedJobs.putAll(jobsList.map(job => job.id -> job).toMap.asJava)) >>
             jobsStore.getRunningJobs.map(jobsList =>
               runningJobs.putAll(jobsList.map(job => job.lock -> job).toMap.asJava)) >>
@@ -67,7 +67,7 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
 
   override def refreshQueuedJobs: Task[Unit] =
     onlyIfLeader {
-      jobsStore.getQueuedJobs.map(jobsList =>
+      jobsStore.getQueuedJobsOrderedByPriority.map(jobsList =>
         queuedJobs.putAll(jobsList.map(job => job.id -> job).toMap.asJava))
     }
 
@@ -97,12 +97,14 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
   private def assignJob(queuedJob: QueuedJob): Task[Unit] =
     time.now.flatMap { now =>
       nodeStore.getAllNodesByGroup(nodeInfoProvider.nodeGroup).map(allNodes =>
-        leastLoadedNode(runningJobs.values().asScala.toList, allNodes) match {
-          case nodeLoad if nodeLoad.jobsWeight < config.maxWeightPerNode =>
+        leastLoadedNode(runningJobs.values().asScala.toList, allNodes, queuedJob.versionRule) match {
+          case Some(nodeLoad) if nodeLoad.jobsWeight < config.maxWeightPerNode =>
             val runningJobInstance = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, now)
             jobsStore.moveQueuedJobToRunningJob(runningJobInstance) >>
               Task.delay(queuedJobs.remove(runningJobInstance.id)) >>
               Task.delay(runningJobs.put(runningJobInstance.lock, runningJobInstance))
+          case None =>
+            logInfo(s"There' no available active nodes with required version to handle ${queuedJob.id}")
         }
       )
     }
@@ -117,7 +119,7 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
       }
     else
       time.now.flatMap { now =>
-        jobsStore.moveRunningJobToFinishedJob(runningJob.toFinishedJob(now, JobResult.FAILURE,
+        jobsStore.moveRunningJobToFinishedJob(runningJob.toFinishedJob(now, JobResult.Failure,
           Some(JobResultMessage(s"${runningJob.nodeId} is dead and max attempts has been reached")))) >>
           Task.delay(runningJobs.remove(runningJob.lock))
       }
@@ -133,7 +135,7 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
     ???
   }
 
-  def leastLoadedNode(runningJobs: List[RunningJob], allNodes: List[JobNode]): NodeLoad = {
+  def leastLoadedNode(runningJobs: List[RunningJob], allNodes: List[JobNode], versionRule: JobVersionRule): Option[NodeLoad] = {
     val nodeLoadOrdering = Ordering.by((x: NodeLoad) => (x.jobsWeight, x.node.nodeId.value))
     val nodesMap = allNodes.map(node => node.nodeId -> node).toMap
 
@@ -152,9 +154,19 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
           allNodesLoad.filterNot(_.node.nodeId == nodeInfoProvider.nodeId))
 
 
-    combineNodeLoads(activeWorkerLoads, allWorkersLoad)
-      .min(nodeLoadOrdering)
+    combineNodeLoads(activeWorkerLoads, allWorkersLoad).filter(checkNodeVersion(versionRule, _)) match {
+      case Nil => None
+      case nodes => Some(nodes.min(nodeLoadOrdering))
+    }
   }
+
+  def checkNodeVersion(versionRule: JobVersionRule, nodeLoad: NodeLoad): Boolean =
+    versionRule match {
+      case JobVersionRule(VersionRuleDirective.AnyVersion, _) => true
+      case JobVersionRule(VersionRuleDirective.Exactly, jobVersion) => nodeLoad.node.version == jobVersion
+      case JobVersionRule(VersionRuleDirective.AtLeast, jobVersion) => nodeLoad.node.version.value >= jobVersion.value
+      case JobVersionRule(VersionRuleDirective.AtMost, jobVersion) => nodeLoad.node.version.value <= jobVersion.value
+    }
 
   def getDeadRunningJobs(allNodes: Set[NodeId]): List[RunningJob] =
     runningJobs.values().asScala.toList.filterNot(job => allNodes.contains(job.nodeId))
