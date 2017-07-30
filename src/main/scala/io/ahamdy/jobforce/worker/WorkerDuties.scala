@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import fs2.interop.cats._
-import fs2.Task
+import fs2.{Strategy, Task}
 import io.ahamdy.jobforce.common.{Logging, Time}
 import io.ahamdy.jobforce.domain._
 import io.ahamdy.jobforce.shared.NodeInfoProvider
@@ -29,7 +29,7 @@ trait WorkerDuties extends UserApi {
 }
 
 class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInfoProvider: NodeInfoProvider,
-                       nodeStore: NodeStore, jobHandlerRegister: JobHandlerRegister, time: Time)
+                       nodeStore: NodeStore, jobHandlerRegister: JobHandlerRegister, time: Time, jobsStrategy: Strategy)
   extends WorkerDuties with Logging {
 
   val localRunningJobs = new ConcurrentHashMap[JobId, RunningJob]()
@@ -38,7 +38,7 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInf
     jobsStore.createQueuedJob(queuedJob)
 
   override def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): Task[Unit] =
-    if (runningJob.attempts.attempts < runningJob.attempts.maxAttempts)
+    if (runningJob.attempts.attempts < runningJob.attempts.maxAttempts.value)
       for {
         now <- time.now
         _ <- queueJob(runningJob.toQueuedJob(now))
@@ -54,14 +54,14 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobsStore: JobsStore, nodeInf
 
   override def runAssignedJobs: Task[Unit] =
     jobsStore.getRunningJobsByNodeId(nodeInfoProvider.nodeId).flatMap { jobs =>
-      parallelSequenceUnit(jobs.map(runAssignedJob))
+      parallelSequenceUnit(jobs.map(runAssignedJob))(jobsStrategy)
     }
 
   def runAssignedJob(runningJob: RunningJob): Task[Unit] =
     jobHandlerRegister.getJobHandler(runningJob.jobType) match {
       case Some(handler) if !localRunningJobs.containsKey(runningJob.id) =>
         runAssignedJobWithHandler(handler, runningJob)
-      case Some(_) => Task.now(())
+      case Some(_) => Task.unit
       case None => logError(s"${runningJob.jobType} has no registered job handler!")
     }
 

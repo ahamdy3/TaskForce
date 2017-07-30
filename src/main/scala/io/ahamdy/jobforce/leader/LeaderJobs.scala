@@ -17,7 +17,7 @@ class LeaderJobsImpl(config: LeaderJobsConfig, leaderDuties: LeaderDuties) exten
 
   override def start(): Unit = {
     scheduler.unsafeSchedule(config.leaderElectionPeriod, leaderDuties.electClusterLeader, resultHandler)
-    scheduler.unsafeSchedule(config.refreshJobsSchedulePeriod, leaderDuties.refreshJobsSchedule, resultHandler)
+    scheduler.unsafeSchedule(config.refreshJobsSchedulePeriod, leaderDuties.refreshJobsSchedule(), resultHandler)
     scheduler.unsafeSchedule(config.refreshQueuedJobsPeriod, leaderDuties.refreshQueuedJobs, resultHandler)
     scheduler.unsafeSchedule(config.assignQueuedJobsPeriod, leaderDuties.assignQueuedJobs, resultHandler)
     scheduler.unsafeSchedule(config.cleanJobsPeriod, leaderDuties.cleanDeadNodesJobs(), resultHandler)

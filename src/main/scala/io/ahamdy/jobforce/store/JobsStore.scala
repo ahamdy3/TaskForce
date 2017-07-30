@@ -21,5 +21,5 @@ trait JobsStore {
   def moveRunningJobToQueuedJob(queuedJob: QueuedJob): Task[Unit]
   def moveRunningJobToFinishedJob(finishedJob: FinishedJob): Task[Unit]
 
-  def getJobLastRunTime(lock: JobLock): Task[Option[ZonedDateTime]]
+  def getJobLastRunTime(id: JobId): Task[Option[ZonedDateTime]]
 }

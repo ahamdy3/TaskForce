@@ -2,7 +2,7 @@ package io.ahamdy.jobforce.leader
 
 import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import fs2.Task
 import fs2.interop.cats._
@@ -22,7 +22,7 @@ trait LeaderDuties {
   def isLeader: Boolean
   def electClusterLeader: Task[Unit]
   def refreshQueuedJobs: Task[Unit]
-  def refreshJobsSchedule: Task[Unit]
+  def refreshJobsSchedule(ignoreLeader: Boolean = false): Task[Unit]
   def queueScheduledJobs: Task[Unit]
   def assignQueuedJobs: Task[Unit]
   def cleanDeadNodesJobs(ignoreLeader: Boolean = false): Task[Unit]
@@ -35,15 +35,15 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
 
   val startTime: ZonedDateTime = time.unsafeNow()
   val leaderFlag = new AtomicBoolean(false)
-  val queuedJobs = new ConcurrentHashMap[JobId, QueuedJob]
-  val runningJobs = new ConcurrentHashMap[JobLock, RunningJob]
-  private var jobsSchedule: List[ScheduledJob] = List.empty
+  val scheduledJobs: AtomicReference[List[ScheduledJob]] = new AtomicReference(List.empty)
+  val queuedJobs = new ConcurrentHashMap[JobId, QueuedJob]()
+  val runningJobs = new ConcurrentHashMap[JobLock, RunningJob]()
 
   override def isLeader: Boolean = leaderFlag.get()
 
   override def electClusterLeader: Task[Unit] =
     time.now.flatMap { now =>
-      nodeStore.getLeaderNodeByGroup(nodeInfoProvider.nodeGroup).flatMap {
+      getLeaderNode.flatMap {
         case node if node.nodeId == nodeInfoProvider.nodeId && node.startTime.minus(now) < config.youngestLeaderAge =>
           logInfo(s"Oldest node still too young to be a leader, current age: ${node.startTime.minus(now)}, leader must be older than ${config.youngestLeaderAge}")
         case node if node.nodeId == nodeInfoProvider.nodeId =>
@@ -52,15 +52,16 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
             jobsStore.getRunningJobs.map(jobsList =>
               runningJobs.putAll(jobsList.map(job => job.lock -> job).toMap.asJava)) >>
             cleanDeadNodesJobs(ignoreLeader = true) >>
+            refreshJobsSchedule(ignoreLeader = true) >>
             Task.delay(leaderFlag.set(true)) >>
             logInfo(s"Node ${node.nodeId} has been elected as a leader")
-        case _ => Task.now(())
+        case _ => Task.unit
       }
     }
 
-  override def refreshJobsSchedule: Task[Unit] = onlyIfLeader {
+  override def refreshJobsSchedule(ignoreLeader: Boolean = false): Task[Unit] = onlyIfLeader(ignoreLeader) {
     jobsScheduleProvider.getJobsSchedule.flatMap { jobs =>
-      Task.delay(jobsSchedule = jobs) >>
+      Task.delay(scheduledJobs.lazySet(jobs)) >>
         logDebug("jobs schedule has been refreshed")
     }
   }
@@ -72,7 +73,7 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
     }
 
   override def queueScheduledJobs: Task[Unit] = onlyIfLeader {
-    sequenceUnit(jobsSchedule.map(queueScheduledJob))
+    sequenceUnit(scheduledJobs.get().map(queueScheduledJob))
   }
 
   override def assignQueuedJobs: Task[Unit] = onlyIfLeader {
@@ -80,15 +81,18 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
   }
 
   private def queueScheduledJob(job: ScheduledJob): Task[Unit] =
-    time.now.flatMap{ now =>
-      jobsStore.getJobLastRunTime(job.lock).map(_.getOrElse(startTime)).flatMap{
-        case lastRunTime if isDue(job, now, lastRunTime) =>
-          val queuedJob = job.toQueuedJob(JobId.generateNew, now)
-          Task.delay(queuedJobs.putIfAbsent(queuedJob.id, queuedJob)) >>
-            jobsStore.createQueuedJob(queuedJob).as(())
-        case _ => Task.now(())
+    if (!runningJobs.containsKey(job.lock) && !queuedJobs.containsKey(job.id))
+      time.now.flatMap { now =>
+        jobsStore.getJobLastRunTime(job.id).map(_.getOrElse(startTime)).flatMap {
+          case lastRunTime if isDue(job, now, lastRunTime) =>
+            val queuedJob = job.toQueuedJob(now)
+            Task.delay(queuedJobs.putIfAbsent(queuedJob.id, queuedJob)) >>
+              jobsStore.createQueuedJob(queuedJob).as(())
+          case _ => Task.unit
+        }
       }
-    }
+    else
+      Task.unit
 
   private def isDue(scheduledJob: ScheduledJob, now: ZonedDateTime, lastRunTime: ZonedDateTime): Boolean =
     scheduledJob.schedule.cronLine.nextExecutionTimeAfter(lastRunTime)
@@ -96,21 +100,26 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
 
   private def assignJob(queuedJob: QueuedJob): Task[Unit] =
     time.now.flatMap { now =>
-      nodeStore.getAllNodesByGroup(nodeInfoProvider.nodeGroup).map(allNodes =>
-        leastLoadedNode(runningJobs.values().asScala.toList, allNodes, queuedJob.versionRule) match {
-          case Some(nodeLoad) if nodeLoad.jobsWeight < config.maxWeightPerNode =>
-            val runningJobInstance = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, now)
-            jobsStore.moveQueuedJobToRunningJob(runningJobInstance) >>
-              Task.delay(queuedJobs.remove(runningJobInstance.id)) >>
-              Task.delay(runningJobs.put(runningJobInstance.lock, runningJobInstance))
-          case None =>
-            logInfo(s"There' no available active nodes with required version to handle ${queuedJob.id}")
-        }
-      )
+      nodeStore.getAllActiveNodesByGroup(nodeInfoProvider.nodeGroup).map {
+        case allActiveNodes if allActiveNodes.length >= config.minActiveNodes =>
+          leastLoadedNode(runningJobs.values().asScala.toList, allActiveNodes, queuedJob.versionRule) match {
+            case Some(nodeLoad) if (nodeLoad.jobsWeight + queuedJob.weight.value) < config.maxWeightPerNode =>
+              val runningJobInstance = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, now)
+              jobsStore.moveQueuedJobToRunningJob(runningJobInstance) >>
+                Task.delay(queuedJobs.remove(runningJobInstance.id)) >>
+                Task.delay(runningJobs.put(runningJobInstance.lock, runningJobInstance))
+            case Some(nodeLoad) =>
+              logInfo(s"The least loaded node ${nodeLoad.node.nodeId} has already loaded with ${nodeLoad.jobsWeight} so it cant take ${queuedJob.id}")
+            case None =>
+              logInfo(s"There' no available active nodes with required version to handle ${queuedJob.id}")
+          }
+        case allActiveNodes =>
+          logInfo(s"Cluster is not ready, current active nodes: ${allActiveNodes.length}, min active nodes: ${config.minActiveNodes}")
+      }
     }
 
   def cleanJob(runningJob: RunningJob): Task[Unit] =
-    if(runningJob.attempts.attempts < runningJob.attempts.maxAttempts)
+    if (runningJob.attempts.attempts < runningJob.attempts.maxAttempts.value)
       time.now.flatMap { now =>
         val queuedJob = runningJob.toQueuedJob(now)
         jobsStore.moveRunningJobToQueuedJob(queuedJob) >>
@@ -131,23 +140,28 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
     nodeStore.getAllNodes.flatMap(allNodes => cleanJobs(getDeadRunningJobs(allNodes.map(_.nodeId).toSet)))
   }
 
+  def getLeaderNode: Task[JobNode] =
+    nodeStore.getAllNodesByGroup(nodeInfoProvider.nodeGroup).map { nodes =>
+      nodes.filter(_.active.value).minBy(node => (node.startTime.toEpochSecond, node.nodeId.value))
+    }
+
   override def scaleCluster: Task[Unit] = onlyIfLeader {
     ???
   }
 
-  def leastLoadedNode(runningJobs: List[RunningJob], allNodes: List[JobNode], versionRule: JobVersionRule): Option[NodeLoad] = {
+  def leastLoadedNode(runningJobs: List[RunningJob], allActiveNodes: List[JobNode], versionRule: JobVersionRule): Option[NodeLoad] = {
     val nodeLoadOrdering = Ordering.by((x: NodeLoad) => (x.jobsWeight, x.node.nodeId.value))
-    val nodesMap = allNodes.map(node => node.nodeId -> node).toMap
+    val activeNodesMap = allActiveNodes.map(node => node.nodeId -> node).toMap
 
     val activeLoads = runningJobs.collect {
-      case job if nodesMap.contains(job.nodeId) && nodesMap(job.nodeId).active.value =>
-        NodeLoad(nodesMap(job.nodeId), job.weight.value)
+      case job if activeNodesMap.contains(job.nodeId) =>
+        NodeLoad(activeNodesMap(job.nodeId), job.weight.value)
     }
 
-    val allNodesLoad = allNodes.map(node => NodeLoad(node, 0)).filter(_.node.active.value)
+    val allNodesLoad = allActiveNodes.map(node => NodeLoad(node, 0))
 
     val (activeWorkerLoads, allWorkersLoad) =
-      if(config.leaderAlsoWorker)
+      if (config.leaderAlsoWorker)
         (activeLoads, allNodesLoad)
       else
         (activeLoads.filterNot(_.node.nodeId == nodeInfoProvider.nodeId),
@@ -175,10 +189,13 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
     (list1 ++ list2).groupBy(_.node).map { case (node, nodes) => NodeLoad(node, nodes.map(_.jobsWeight).sum) }.toList
 
   private def onlyIfLeader(task: Task[Unit]): Task[Unit] =
-    if (isLeader) task else Task.now(())
+    if (isLeader) task else Task.unit
 
   private def onlyIfLeader(ignore: Boolean)(task: Task[Unit]): Task[Unit] =
-    if (ignore || isLeader) task else Task.now(())
+    if (ignore || isLeader) task else Task.unit
 }
 
-case class JobForceLeaderConfig(maxWeightPerNode: Int, youngestLeaderAge: FiniteDuration, leaderAlsoWorker: Boolean)
+case class JobForceLeaderConfig(minActiveNodes: Int,
+                                maxWeightPerNode: Int,
+                                youngestLeaderAge: FiniteDuration,
+                                leaderAlsoWorker: Boolean)

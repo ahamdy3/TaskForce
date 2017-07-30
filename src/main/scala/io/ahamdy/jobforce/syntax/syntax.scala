@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 
 package object syntax {
 
-  implicit class ZonedDateTimeSyntax(zonedDateTime: ZonedDateTime) {
+  implicit class ZonedDateTimeSyntax(val zonedDateTime: ZonedDateTime) {
     def minus(zonedDateTimeB: ZonedDateTime): FiniteDuration =
       Duration.apply(ChronoUnit.NANOS.between(zonedDateTime, zonedDateTimeB), NANOSECONDS)
 
@@ -20,6 +20,10 @@ package object syntax {
 
     def isBetween(olderTime: ZonedDateTime, newerTime: ZonedDateTime): Boolean =
       zonedDateTime.isAfter(olderTime) && zonedDateTime.isBefore(newerTime)
+  }
+
+  implicit class TaskObjectSyntax(val task: Task.type) {
+    val unit: Task[Unit] = Task.now(())
   }
 
   def sequenceUnit[A](input: List[Task[A]]): Task[Unit] =

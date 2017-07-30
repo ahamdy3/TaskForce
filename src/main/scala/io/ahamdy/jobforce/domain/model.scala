@@ -13,6 +13,10 @@ case class NodeGroup(value: String) extends AnyVal
 case class NodeActive(value: Boolean) extends AnyVal
 case class NodeVersion(value: String) extends AnyVal
 
+object NodeVersion {
+  def IGNORED = NodeVersion("IGNORED")
+}
+
 case class JobId(value: String) extends AnyVal
 case class JobLock(value: String) extends AnyVal
 case class JobType(value: String) extends AnyVal
@@ -40,17 +44,13 @@ object VersionRuleDirective extends Enum[VersionRuleDirective] {
   val values = findValues
 }
 
-case class JobAttempts(attempts: Int, maxAttempts: Int) {
+case class JobMaxAttempts(value: Int) extends AnyVal
+case class JobAttempts(attempts: Int, maxAttempts: JobMaxAttempts) {
   def incAttempts: JobAttempts = JobAttempts(attempts +1, maxAttempts)
 }
 
 object JobId {
   def generateNew: JobId = JobId(UUID.randomUUID().toString)
-}
-
-object JobAttempts {
-  def withMaxAttempts(maxAttempts: Int = 5): JobAttempts =
-    JobAttempts(attempts = 0, maxAttempts = maxAttempts)
 }
 
 abstract class JobInstance {
@@ -65,11 +65,12 @@ abstract class JobInstance {
   def versionRule: JobVersionRule
 }
 
-case class ScheduledJob(lock: JobLock, jobType: JobType, weight: JobWeight, data: Map[String, String],
-                        schedule: JobSchedule, attempts: JobAttempts, priority: JobPriority,
-                        versionRule: JobVersionRule = JobVersionRule(VersionRuleDirective.AnyVersion, NodeVersion("IGNORED"))) {
-  def toQueuedJob(id: JobId, queuingTime: ZonedDateTime): QueuedJob =
-    QueuedJob(id, lock, jobType, weight, data, attempts, priority, queuingTime, None, versionRule)
+case class ScheduledJob(id: JobId, lock: JobLock, jobType: JobType, weight: JobWeight, data: Map[String, String],
+                        schedule: JobSchedule, maxAttempts: JobMaxAttempts, priority: JobPriority,
+                        versionRule: JobVersionRule = JobVersionRule(VersionRuleDirective.AnyVersion,
+                          NodeVersion("IGNORED"))) {
+  def toQueuedJob(queuingTime: ZonedDateTime): QueuedJob =
+    QueuedJob(id, lock, jobType, weight, data, JobAttempts(0, maxAttempts), priority, queuingTime, None, versionRule)
 }
 
 case class QueuedJob(id: JobId, lock: JobLock, jobType: JobType, weight: JobWeight, data: Map[String, String],
