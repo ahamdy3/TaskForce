@@ -27,6 +27,13 @@ object CronLine {
 
   def parse(cron: String, syntax: CronType, timeZone: ZoneId): Option[CronLine] = {
     val parser = new CronParser(CronDefinitionBuilder.instanceDefinitionFor(syntax))
-    Either.catchOnly[IllegalArgumentException](parser.parse(cron)).toOption.map(cron => CronLine(cron, timeZone))
+    Either.catchOnly[IllegalArgumentException](
+      try {
+        parser.parse(cron)
+
+      } catch {
+        case e: Throwable => println(e)
+          throw e
+      }).toOption.map(cron => CronLine(cron, timeZone))
   }
 }

@@ -10,7 +10,7 @@ import io.ahamdy.jobforce.common.{Logging, Time}
 import io.ahamdy.jobforce.domain._
 import io.ahamdy.jobforce.shared.NodeInfoProvider
 import io.ahamdy.jobforce.store.{JobsStore, NodeStore}
-import io.ahamdy.jobforce.syntax._
+import io.ahamdy.jobforce.syntax.task._
 
 trait UserApi {
   def queueJob(queuedJob: QueuedJob): Task[Boolean]

@@ -4,7 +4,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import io.ahamdy.jobforce.syntax._
+import io.ahamdy.jobforce.syntax.zonedDateTime._
 import cats.syntax.flatMap._
 import fs2.interop.cats._
 

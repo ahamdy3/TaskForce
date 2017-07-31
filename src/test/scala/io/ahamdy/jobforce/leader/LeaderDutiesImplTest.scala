@@ -7,7 +7,7 @@ import com.cronutils.model.CronType
 import fs2.Task
 import fs2.interop.cats._
 import cats.syntax.flatMap._
-import io.ahamdy.jobforce.common.{MutableTime, Time}
+import io.ahamdy.jobforce.common.{DummyTime, Time}
 import io.ahamdy.jobforce.domain._
 import io.ahamdy.jobforce.scheduling.{CronLine, JobsScheduleProvider}
 import io.ahamdy.jobforce.shared.NodeInfoProvider
@@ -24,7 +24,18 @@ class LeaderDutiesImplTest extends StandardSpec{
 
   sequential
 
-  val dummyTime = new MutableTime(ZonedDateTime.now())
+  val scheduledJob = ScheduledJob(
+    JobId("job-id-1"),
+    JobLock("test-lock-1"),
+    JobType("test-type-1"),
+    JobWeight(5),
+    Map.empty,
+    JobSchedule(CronLine.parse("1 ? ? ? * *", CronType.QUARTZ, ZoneId.of("UTC")).get, 1.minute),
+    JobMaxAttempts(5),
+    JobPriority(1)
+  )
+
+  val dummyTime = new DummyTime(ZonedDateTime.now())
 
   val node1InfoProvider = new NodeInfoProvider {
     override def nodeGroup: NodeGroup = NodeGroup("test-group-1")
@@ -106,6 +117,8 @@ class LeaderDutiesImplTest extends StandardSpec{
       runningJobStore.clear()
       finishedJobStore.clear()
     }
+
+    def isEmpty: Boolean = queuedJobStore.isEmpty && runningJobStore.isEmpty && finishedJobStore.isEmpty
   }
 
   def createNewLeader(config: JobForceLeaderConfig = config,
@@ -149,16 +162,6 @@ class LeaderDutiesImplTest extends StandardSpec{
     "refresh ScheduledJobs, QueuedJobs and runningJobs in leader cache when leader is elected" in {
       jobsStore.reset()
 
-      val scheduledJob = ScheduledJob(
-        JobId("job-id-1"),
-        JobLock("test-lock-1"),
-        JobType("test-type-1"),
-        JobWeight(5),
-        Map("test-input-1" -> "1"),
-        JobSchedule(CronLine.parse("0 0 7 ? * *", CronType.QUARTZ, ZoneId.of("UTC")).get, 1.minute),
-        JobMaxAttempts(5),
-        JobPriority(1)
-      )
       jobsScheduleProvider.scheduledJobs.append(scheduledJob)
 
       val queuedJob = scheduledJob.copy(id = JobId("job-id-2")).toQueuedJob(dummyTime.unsafeNow())
@@ -212,9 +215,7 @@ class LeaderDutiesImplTest extends StandardSpec{
       leader.queuedJobs.values().asScala must beEmpty
       nonLeader.queuedJobs.values().asScala must beEmpty
 
-      val queuedJob = QueuedJob(JobId("job-id-10"), JobLock("job-lock-1"), JobType("job-type-1"), JobWeight(1),
-        Map.empty[String,String], JobAttempts(0, JobMaxAttempts(1)), JobPriority(1), dummyTime.unsafeNow(), None,
-        JobVersionRule(VersionRuleDirective.AnyVersion, NodeVersion.IGNORED))
+      val queuedJob = scheduledJob.toQueuedJob(dummyTime.unsafeNow())
       jobsStore.queuedJobStore.put(queuedJob.id, queuedJob)
 
       leader.refreshQueuedJobs must beSucceedingTask
@@ -235,16 +236,6 @@ class LeaderDutiesImplTest extends StandardSpec{
 
       leader.electClusterLeader must beSucceedingTask
 
-      val scheduledJob = ScheduledJob(
-        JobId("job-id-1"),
-        JobLock("test-lock-1"),
-        JobType("test-type-1"),
-        JobWeight(5),
-        Map.empty,
-        JobSchedule(CronLine.parse("0 0 7 ? * *", CronType.QUARTZ, ZoneId.of("UTC")).get, 1.minute),
-        JobMaxAttempts(5),
-        JobPriority(1)
-      )
       jobsScheduleProvider.scheduledJobs.append(scheduledJob)
 
       leader.refreshJobsSchedule() must beSucceedingTask
@@ -264,6 +255,32 @@ class LeaderDutiesImplTest extends StandardSpec{
 
       nonLeader.refreshJobsSchedule(ignoreLeader = true) must beSucceedingTask
       leader.scheduledJobs.get.toSet mustEqual Set(scheduledJob, scheduledJob2)
+    }
+  }
+
+  "LeaderDutiesImpl.queueScheduledJobs" should {
+    "queue due scheduled jobs only if leader and if the job is not already queued or running" in {
+      jobsStore.reset()
+      jobsScheduleProvider.reset()
+
+      val leader = createNewLeader()
+
+      leader.electClusterLeader must beSucceedingTask
+
+      jobsStore.isEmpty must beTrue
+      jobsScheduleProvider.scheduledJobs must beEmpty
+      leader.queuedJobs.isEmpty must beTrue
+
+      leader.queueScheduledJobs must beSucceedingTask
+
+      leader.queuedJobs.isEmpty must beTrue
+
+      jobsScheduleProvider.scheduledJobs.append(scheduledJob)
+      leader.refreshJobsSchedule() must beSucceedingTask
+
+      leader.queueScheduledJobs must beSucceedingTask
+
+      leader.queuedJobs.values().asScala.toList mustEqual List(scheduledJob.toQueuedJob(dummyTime.unsafeNow()))
     }
   }
 }
