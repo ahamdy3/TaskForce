@@ -1,11 +1,16 @@
 package io.ahamdy.jobforce.scheduling
 
 import java.time.{ZoneId, ZonedDateTime}
+
 import cats.implicits._
 import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.model.time.ExecutionTime
 import com.cronutils.model.{Cron, CronType}
 import com.cronutils.parser.CronParser
+
+import io.ahamdy.jobforce.syntax.zonedDateTime._
+
+import scala.concurrent.duration.FiniteDuration
 
 
 case class CronLine(cron: Cron, timeZone: ZoneId) {
@@ -20,20 +25,16 @@ case class CronLine(cron: Cron, timeZone: ZoneId) {
   def nextExecutionTimeAfter(time: ZonedDateTime): ZonedDateTime =
     ExecutionTime.forCron(cron).nextExecution(time.withZoneSameInstant(timeZone))
 
+  def toDurationOn(time: ZonedDateTime): FiniteDuration =
+    latestExecutionTimeBefore(time).durationBetween(nextExecutionTimeAfter(time))
+
   override def toString: String = s"CronLine(${cron.asString}, $timeZone)"
 }
 
 object CronLine {
 
-  def parse(cron: String, syntax: CronType, timeZone: ZoneId): Option[CronLine] = {
+  def parse(cron: String, syntax: CronType, timeZone: ZoneId): Either[Throwable, CronLine] = {
     val parser = new CronParser(CronDefinitionBuilder.instanceDefinitionFor(syntax))
-    Either.catchOnly[IllegalArgumentException](
-      try {
-        parser.parse(cron)
-
-      } catch {
-        case e: Throwable => println(e)
-          throw e
-      }).toOption.map(cron => CronLine(cron, timeZone))
+    Either.catchNonFatal(parser.parse(cron)).map(cron => CronLine(cron, timeZone))
   }
 }

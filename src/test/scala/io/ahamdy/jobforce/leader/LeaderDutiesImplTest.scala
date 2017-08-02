@@ -18,6 +18,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
+import io.ahamdy.jobforce.testing.syntax.either._
 
 
 class LeaderDutiesImplTest extends StandardSpec{
@@ -30,7 +31,7 @@ class LeaderDutiesImplTest extends StandardSpec{
     JobType("test-type-1"),
     JobWeight(5),
     Map.empty,
-    JobSchedule(CronLine.parse("1 ? ? ? * *", CronType.QUARTZ, ZoneId.of("UTC")).get, 1.minute),
+    JobSchedule(CronLine.parse("1 ? ? ? * *", CronType.QUARTZ, ZoneId.of("UTC")).getRight, 1.minute),
     JobMaxAttempts(5),
     JobPriority(1)
   )

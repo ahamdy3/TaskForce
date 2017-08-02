@@ -6,6 +6,7 @@ import java.util.UUID
 import enumeratum.{Enum, EnumEntry}
 import io.ahamdy.jobforce.scheduling.CronLine
 
+import scala.collection.immutable
 import scala.concurrent.duration.FiniteDuration
 
 case class NodeId(value: String) extends AnyVal
@@ -26,12 +27,16 @@ case class JobSchedule(cronLine: CronLine, startTimeWindow: FiniteDuration)
 case class JobResultMessage(value: String) extends AnyVal
 case class JobVersionRule(directive: VersionRuleDirective, nodeVersion: NodeVersion)
 
+object JobVersionRule {
+  val IGNORE: JobVersionRule = JobVersionRule(VersionRuleDirective.AnyVersion, NodeVersion.IGNORED)
+}
+
 sealed trait JobResult extends EnumEntry with EnumEntry.Lowercase
 object JobResult extends Enum[JobResult] {
   case object Success extends JobResult
   case object Failure extends JobResult
 
-  val values = findValues
+  val values: immutable.IndexedSeq[JobResult] = findValues
 }
 
 sealed trait VersionRuleDirective extends EnumEntry with EnumEntry.Lowercase
@@ -41,7 +46,7 @@ object VersionRuleDirective extends Enum[VersionRuleDirective] {
   case object Exactly extends VersionRuleDirective
   case object AnyVersion extends VersionRuleDirective
 
-  val values = findValues
+  val values: immutable.IndexedSeq[VersionRuleDirective] = findValues
 }
 
 case class JobMaxAttempts(value: Int) extends AnyVal
