@@ -9,7 +9,8 @@ object NodeLoadBalancer {
                       versionRule: JobVersionRule,
                       leaderNodeId: NodeId,
                       leaderAlsoWorker: Boolean): Option[NodeLoad] = {
-    val nodeLoadOrdering = Ordering.by((x: NodeLoad) => (x.jobsWeight, x.node.nodeId.value))
+    val nodeLoadOrdering = Ordering.by((x: NodeLoad) =>
+      (x.jobsWeight, x.node.startTime.toInstant.toEpochMilli, x.node.nodeId.value))
     val activeNodesMap = allActiveNodes.map(node => node.nodeId -> node).toMap
 
     val activeLoads = runningJobs.collect {
