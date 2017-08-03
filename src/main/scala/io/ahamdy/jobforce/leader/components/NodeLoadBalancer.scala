@@ -28,7 +28,8 @@ object NodeLoadBalancer {
           allNodesLoad.filterNot(_.node.nodeId == leaderNodeId))
 
 
-    combineNodeLoads(activeWorkerLoads, allWorkersLoad).filter(NodeVersionChecker.checkVersion(versionRule, _)) match {
+    combineNodeLoads(activeWorkerLoads, allWorkersLoad)
+      .filter(nodeLoad => NodeVersionChecker.checkVersion(versionRule, nodeLoad.node)) match {
       case Nil => None
       case nodes => Some(nodes.min(nodeLoadOrdering))
     }
