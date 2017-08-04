@@ -31,9 +31,9 @@ class LeaderDutiesImplTest extends StandardSpec{
     JobType("test-type-1"),
     JobWeight(5),
     Map.empty,
-    JobSchedule(CronLine.parse("1 ? ? ? * *", CronType.QUARTZ, ZoneId.of("UTC")).getRight, 1.minute),
+    JobSchedule(CronLine.parse("0 * * * * ?", CronType.QUARTZ, ZoneId.of("UTC")).getRight, 2.minute),
     JobMaxAttempts(5),
-    JobPriority(1)
+    JobPriority(2)
   )
 
   val dummyTime = new DummyTime(ZonedDateTime.now())
@@ -283,5 +283,85 @@ class LeaderDutiesImplTest extends StandardSpec{
 
       leader.queuedJobs.values().asScala.toList mustEqual List(scheduledJob.toQueuedJob(dummyTime.unsafeNow()))
     }
+  }
+
+  "LeaderDutiesImpl.assignQueuedJobs" should {
+    "assign queued jobs to active nodes with respect to load balancing and version requirements" in {
+
+      val scheduledJob1 = scheduledJob.copy(id = JobId("test-job1"), lock = JobLock("lock-1"),
+        weight = JobWeight(100), priority = JobPriority(2))
+      val scheduledJob2 = scheduledJob.copy(id = JobId("test-job2"), lock = JobLock("lock-2"),
+        weight = JobWeight(100), priority = JobPriority(3))
+
+      val queuedJob1 = scheduledJob1.toQueuedJob(dummyTime.unsafeNow())
+      val queuedJob2 = scheduledJob2.toQueuedJob(dummyTime.unsafeNow())
+
+      val runningJob1 = queuedJob1.toRunningJobAndIncAttempts(NodeId("test-node-1"), dummyTime.unsafeNow())
+      val runningJob2 = queuedJob2.toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow())
+
+      jobsStore.reset()
+      jobsScheduleProvider.reset()
+      jobsScheduleProvider.scheduledJobs.append(scheduledJob1, scheduledJob2)
+
+      val leader = createNewLeader()
+
+      leader.electClusterLeader must beSucceedingTask
+      leader.isLeader must beTrue
+      leader.queueScheduledJobs must beSucceedingTask
+
+
+
+      leader.queuedJobs.values().asScala must containTheSameElementsAs(List(queuedJob1, queuedJob2))
+      jobsStore.queuedJobStore.values().asScala must containTheSameElementsAs(List(queuedJob1, queuedJob2))
+
+      leader.assignQueuedJobs must beSucceedingTask
+
+      leader.queuedJobs.values().asScala must beEmpty
+      jobsStore.queuedJobStore.values().asScala must beEmpty
+
+      leader.runningJobs.values().asScala must containTheSameElementsAs(List(runningJob1, runningJob2))
+      jobsStore.runningJobStore.values().asScala must containTheSameElementsAs(List(runningJob1, runningJob2))
+    }
+  }
+
+  "not assign jobs to any node if the least loaded node will be loaded with more than maxWeightPerNode ordered by priority and jobId" in {
+    jobsStore.reset()
+    jobsScheduleProvider.reset()
+
+    val scheduledJob1 =
+      scheduledJob.copy(id = JobId("test-job1"), lock = JobLock("lock-1"), weight = JobWeight(100), priority = JobPriority(2))
+    val scheduledJob2 =
+      scheduledJob.copy(id = JobId("test-job2"), lock = JobLock("lock-2"), weight = JobWeight(100), priority = JobPriority(3))
+    val scheduledJob3 =
+      scheduledJob.copy(id = JobId("test-job3"), lock = JobLock("lock-3"), weight = JobWeight(100), priority = JobPriority(2))
+    val scheduledJob4 =
+      scheduledJob.copy(id = JobId("test-job4"), lock = JobLock("lock-4"), weight = JobWeight(100), priority = JobPriority(1))
+
+
+    val queuedJob2 = scheduledJob2.toQueuedJob(dummyTime.unsafeNow())
+    val queuedJob3 = scheduledJob3.toQueuedJob(dummyTime.unsafeNow())
+
+    val runningJob1 = scheduledJob1.toQueuedJob(dummyTime.unsafeNow())
+      .toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow()) // second highest priority
+    val runningJob4 = scheduledJob4.toQueuedJob(dummyTime.unsafeNow())
+      .toRunningJobAndIncAttempts(NodeId("test-node-1"), dummyTime.unsafeNow()) // highest priority
+
+    jobsScheduleProvider.scheduledJobs.append(
+      scheduledJob1,
+      scheduledJob2,
+      scheduledJob3,
+      scheduledJob4,
+    )
+
+    val leader = createNewLeader()
+    leader.electClusterLeader must beSucceedingTask
+    leader.isLeader must beTrue
+
+    leader.queueScheduledJobs must beSucceedingTask
+    leader.assignQueuedJobs must beSucceedingTask
+
+
+    jobsStore.queuedJobStore.values().asScala must containTheSameElementsAs(List(queuedJob2, queuedJob3))
+    jobsStore.runningJobStore.values().asScala must containTheSameElementsAs(List(runningJob1, runningJob4))
   }
 }

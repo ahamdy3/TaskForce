@@ -45,8 +45,8 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
   override def electClusterLeader: Task[Unit] =
     time.now.flatMap { now =>
       getLeaderNode.flatMap {
-        case node if node.nodeId == nodeInfoProvider.nodeId && node.startTime.minus(now) < config.youngestLeaderAge =>
-          logInfo(s"Oldest node still too young to be a leader, current age: ${node.startTime.minus(now)}, leader must be older than ${config.youngestLeaderAge}")
+        case node if node.nodeId == nodeInfoProvider.nodeId && node.startTime.durationBetween(now) < config.youngestLeaderAge =>
+          logInfo(s"Oldest node still too young to be a leader, current age: ${node.startTime.durationBetween(now)}, leader must be older than ${config.youngestLeaderAge}")
         case node if node.nodeId == nodeInfoProvider.nodeId =>
           jobsStore.getQueuedJobsOrderedByPriority.map(jobsList =>
             queuedJobs.putAll(jobsList.map(job => job.id -> job).toMap.asJava)) >>
@@ -78,7 +78,7 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
   }
 
   override def assignQueuedJobs: Task[Unit] = onlyIfLeader {
-    sequenceUnit(queuedJobs.values().asScala.toList.map(assignJob))
+    sequenceUnit(queuedJobs.values().asScala.toList.sortBy(job => (job.priority.value, job.id.value)).map(assignJob))
   }
 
   def queueScheduledJob(job: ScheduledJob): Task[Unit] =
@@ -97,15 +97,15 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
 
   def assignJob(queuedJob: QueuedJob): Task[Unit] =
     time.now.flatMap { now =>
-      nodeStore.getAllActiveNodesByGroup(nodeInfoProvider.nodeGroup).map {
+      nodeStore.getAllActiveNodesByGroup(nodeInfoProvider.nodeGroup).flatMap {
         case allActiveNodes if allActiveNodes.length >= config.minActiveNodes =>
           NodeLoadBalancer.leastLoadedNode(runningJobs.values().asScala.toList, allActiveNodes, queuedJob.versionRule,
             nodeInfoProvider.nodeId, config.leaderAlsoWorker) match {
-            case Some(nodeLoad) if (nodeLoad.jobsWeight + queuedJob.weight.value) < config.maxWeightPerNode =>
-              val runningJobInstance = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, now)
-              jobsStore.moveQueuedJobToRunningJob(runningJobInstance) >>
-                Task.delay(queuedJobs.remove(runningJobInstance.id)) >>
-                Task.delay(runningJobs.put(runningJobInstance.lock, runningJobInstance))
+            case Some(nodeLoad) if (nodeLoad.jobsWeight + queuedJob.weight.value) <= config.maxWeightPerNode =>
+              val runningJob = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, now)
+              jobsStore.moveQueuedJobToRunningJob(runningJob) >>
+                Task.delay(queuedJobs.remove(runningJob.id)) >>
+                Task.delay(runningJobs.put(runningJob.lock, runningJob))
             case Some(nodeLoad) =>
               logInfo(s"The least loaded node ${nodeLoad.node.nodeId} has already loaded with ${nodeLoad.jobsWeight} so it cant take ${queuedJob.id}")
             case None =>
