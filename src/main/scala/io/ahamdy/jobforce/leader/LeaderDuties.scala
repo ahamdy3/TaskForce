@@ -118,18 +118,20 @@ class LeaderDutiesImpl(config: JobForceLeaderConfig, nodeInfoProvider: NodeInfoP
 
   def cleanJob(runningJob: RunningJob): Task[Unit] =
     if (runningJob.attempts.attempts < runningJob.attempts.maxAttempts.value)
-      time.now.flatMap { now =>
-        val queuedJob = runningJob.toQueuedJob(now)
-        jobsStore.moveRunningJobToQueuedJob(queuedJob) >>
-          Task.delay(queuedJobs.put(queuedJob.id, queuedJob)) >>
-          Task.delay(runningJobs.remove(queuedJob.lock))
-      }
-    else
-      time.now.flatMap { now =>
-        jobsStore.moveRunningJobToFinishedJob(runningJob.toFinishedJob(now, JobResult.Failure,
-          Some(JobResultMessage(s"${runningJob.nodeId} is dead and max attempts has been reached")))) >>
-          Task.delay(runningJobs.remove(runningJob.lock))
-      }
+      for {
+        now <- time.now
+        queuedJob <- Task.now(runningJob.toQueuedJob(now))
+        _ <- jobsStore.moveRunningJobToQueuedJob(queuedJob)
+        _ <- Task.delay(queuedJobs.put(queuedJob.id, queuedJob))
+        _ <- Task.delay(runningJobs.remove(runningJob.lock))
+      } yield ()
+      else
+        for{
+          now <- time.now
+          _ <- jobsStore.moveRunningJobToFinishedJob(runningJob.toFinishedJob(now, JobResult.Failure,
+            Some(JobResultMessage(s"${runningJob.nodeId} is dead and max attempts has been reached"))))
+          _ <- Task.delay(runningJobs.remove(runningJob.lock))
+        }yield ()
 
   def cleanJobs(runningJob: List[RunningJob]): Task[Unit] =
     sequenceUnit(runningJob.map(cleanJob))

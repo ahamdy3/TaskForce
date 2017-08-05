@@ -2,6 +2,7 @@ package io.ahamdy.jobforce.leader
 
 import java.time.{ZoneId, ZonedDateTime}
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 import com.cronutils.model.CronType
 import fs2.Task
@@ -44,8 +45,13 @@ class LeaderDutiesImplTest extends StandardSpec{
   }
 
   val node2InfoProvider = new NodeInfoProvider {
+    override def nodeGroup: NodeGroup = NodeGroup("test-group-1")
+    override def nodeId: NodeId = NodeId("test-node-2")
+  }
+
+  val node3InfoProvider = new NodeInfoProvider {
     override def nodeGroup: NodeGroup = NodeGroup("test-group-2")
-    override def nodeId: NodeId = NodeId("test-node-1")
+    override def nodeId: NodeId = NodeId("test-node-3")
   }
 
   val jobsScheduleProvider = new JobsScheduleProvider {
@@ -60,7 +66,7 @@ class LeaderDutiesImplTest extends StandardSpec{
     override def getAllNodes: Task[List[JobNode]] = Task.now(List(
       JobNode(NodeId("test-node-1"), NodeGroup("test-group-1"), dummyTime.unsafeNow().minusMinutes(1), NodeActive(true), NodeVersion("1.0.0")),
       JobNode(NodeId("test-node-2"), NodeGroup("test-group-1"), dummyTime.unsafeNow(), NodeActive(true), NodeVersion("1.0.0")),
-      JobNode(NodeId("test-node-3"), NodeGroup("test-group-2"), dummyTime.unsafeNow().minusMinutes(1), NodeActive(true), NodeVersion("1.0.0"))
+      JobNode(NodeId("test-node-3"), NodeGroup("test-group-2"), dummyTime.unsafeNow().minusMinutes(1), NodeActive(true), NodeVersion("1.0.0")) // other group
     ))
   }
 
@@ -97,7 +103,7 @@ class LeaderDutiesImplTest extends StandardSpec{
       Task.delay(finishedJobStore.toList)
 
     override def moveRunningJobToQueuedJob(queuedJob: QueuedJob): Task[Unit] =
-      Task.delay(runningJobStore.remove(queuedJob.id)) >>
+      Task.delay(runningJobStore.remove(queuedJob.lock)) >>
       Task.delay{
         if(Option(queuedJobStore.putIfAbsent(queuedJob.id, queuedJob)).isEmpty)
           ()
@@ -107,7 +113,7 @@ class LeaderDutiesImplTest extends StandardSpec{
 
 
     override def moveRunningJobToFinishedJob(finishedJob: FinishedJob): Task[Unit] =
-      Task.delay(runningJobStore.remove(finishedJob.id)) >>
+      Task.delay(runningJobStore.remove(finishedJob.lock)) >>
         Task.delay(finishedJobStore.append(finishedJob))
 
     override def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]] =
@@ -363,5 +369,69 @@ class LeaderDutiesImplTest extends StandardSpec{
 
     jobsStore.queuedJobStore.values().asScala must containTheSameElementsAs(List(queuedJob2, queuedJob3))
     jobsStore.runningJobStore.values().asScala must containTheSameElementsAs(List(runningJob1, runningJob4))
+  }
+
+  "LeaderDutiesImpl.cleanDeadNodesJobs" should {
+    "move running jobs back to queue only if they were running on dead node and attempts limit not reached," +
+      "move running jobs to finished jobs if they were running on dead node and attempts limit has been reached" in {
+      jobsStore.reset()
+      jobsScheduleProvider.reset()
+
+      val mutableNodeStore = new NodeStore {
+        val nodes = new AtomicReference[List[JobNode]](List(
+          JobNode(NodeId("test-node-1"), NodeGroup("test-group-1"), dummyTime.unsafeNow().minusMinutes(2), NodeActive(true), NodeVersion("1.0.0")),
+          JobNode(NodeId("test-node-2"), NodeGroup("test-group-1"), dummyTime.unsafeNow().minusMinutes(1), NodeActive(true), NodeVersion("1.0.0"))
+        ))
+
+        override def getAllNodes: Task[List[JobNode]] = Task.now(nodes.get())
+      }
+
+      val scheduledJob1 = scheduledJob.copy(id = JobId("test-job1"), lock = JobLock("lock-1"),
+        weight = JobWeight(100), priority = JobPriority(1))
+      val scheduledJob2 = scheduledJob.copy(id = JobId("test-job2"), lock = JobLock("lock-2"),
+        weight = JobWeight(50), priority = JobPriority(1))
+      val scheduledJob3 = scheduledJob.copy(id = JobId("test-job3"), lock = JobLock("lock-3"),
+        weight = JobWeight(50), priority = JobPriority(1), maxAttempts = JobMaxAttempts(1))
+
+      val queuedJob1 = scheduledJob1.toQueuedJob(dummyTime.unsafeNow())
+      val queuedJob2 = scheduledJob2.toQueuedJob(dummyTime.unsafeNow())
+      val queuedJob3 = scheduledJob3.toQueuedJob(dummyTime.unsafeNow())
+
+      val runningJob1 = queuedJob1.toRunningJobAndIncAttempts(NodeId("test-node-1"), dummyTime.unsafeNow())
+      val runningJob2 = queuedJob2.toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow())
+      val runningJob3 = queuedJob3.toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow())
+
+      jobsStore.runningJobStore.put(runningJob1.lock, runningJob1)
+      jobsStore.runningJobStore.put(runningJob2.lock, runningJob2)
+      jobsStore.runningJobStore.put(runningJob3.lock, runningJob3)
+
+      val leader = createNewLeader(nodeStore = mutableNodeStore)
+      leader.electClusterLeader must beSucceedingTask
+      leader.isLeader must beTrue
+
+      leader.cleanDeadNodesJobs() must beSucceedingTask
+
+      leader.queuedJobs.isEmpty must beTrue
+      jobsStore.queuedJobStore.isEmpty must beTrue
+
+      leader.runningJobs.values().asScala must containTheSameElementsAs(List(runningJob1, runningJob2, runningJob3))
+      jobsStore.runningJobStore.values().asScala must containTheSameElementsAs(List(runningJob1, runningJob2, runningJob3))
+
+      mutableNodeStore.nodes.set(List(
+        JobNode(NodeId("test-node-1"), NodeGroup("test-group-1"), dummyTime.unsafeNow().minusSeconds(2), NodeActive(true), NodeVersion("1.0.0"))))
+
+      leader.cleanDeadNodesJobs() must beSucceedingTask
+
+      val queuedJob2WithAttempt = queuedJob2.copy(attempts = queuedJob2.attempts.incAttempts)
+      val finishedJob3 = runningJob3.toFinishedJob(dummyTime.unsafeNow(), JobResult.Failure,
+        Some(JobResultMessage(s"${runningJob3.nodeId} is dead and max attempts has been reached")))
+
+      leader.queuedJobs.values().asScala must containTheSameElementsAs(List(queuedJob2WithAttempt))
+      jobsStore.queuedJobStore.values().asScala must containTheSameElementsAs(List(queuedJob2WithAttempt))
+      jobsStore.finishedJobStore must containTheSameElementsAs(List(finishedJob3))
+
+      leader.runningJobs.values().asScala must containTheSameElementsAs(List(runningJob1))
+      jobsStore.runningJobStore.values().asScala must containTheSameElementsAs(List(runningJob1))
+    }
   }
 }
