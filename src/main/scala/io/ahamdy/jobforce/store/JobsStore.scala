@@ -7,7 +7,7 @@ import io.ahamdy.jobforce.domain._
 
 
 trait JobsStore {
-  def getQueuedJobsOrderedByPriority: Task[List[QueuedJob]]
+  def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]]
   def getRunningJobs: Task[List[RunningJob]]
   def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]]
   def getFinishedJobs: Task[List[FinishedJob]]

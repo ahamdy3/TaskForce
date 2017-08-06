@@ -84,8 +84,8 @@ class LeaderDutiesImplTest extends StandardSpec{
           case times if times.length > 1 => Task.delay(Some(times.maxBy(_.getNano)))
         }
 
-    override def getQueuedJobsOrderedByPriority: Task[List[QueuedJob]] =
-      Task.delay(queuedJobStore.values().asScala.toList.sortBy(_.priority.value))
+    override def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]] =
+      Task.delay(queuedJobStore.values().asScala.toList.sortBy(job => (job.priority.value, job.queuingTime.toEpochSecond)))
 
     override def moveQueuedJobToRunningJob(runningJob: RunningJob): Task[Unit] =
       if(Option(runningJobStore.putIfAbsent(runningJob.lock, runningJob)).isEmpty)

@@ -8,7 +8,8 @@ object NodeLoadBalancer {
                       allActiveNodes: List[JobNode],
                       versionRule: JobVersionRule,
                       leaderNodeId: NodeId,
-                      leaderAlsoWorker: Boolean): Option[NodeLoad] = {
+                      leaderAlsoWorker: Boolean,
+                      position: Int): Option[NodeLoad] = {
     val nodeLoadOrdering = Ordering.by((x: NodeLoad) =>
       (x.jobsWeight, x.node.startTime.toInstant.toEpochMilli, x.node.nodeId.value))
     val activeNodesMap = allActiveNodes.map(node => node.nodeId -> node).toMap
@@ -30,11 +31,14 @@ object NodeLoadBalancer {
 
     combineNodeLoads(activeWorkerLoads, allWorkersLoad)
       .filter(nodeLoad => NodeVersionChecker.checkVersion(versionRule, nodeLoad.node)) match {
-      case Nil => None
-      case nodes => Some(nodes.min(nodeLoadOrdering))
+      case nodes if position < nodes.length => Some(nodes.sorted(nodeLoadOrdering)(position))
+      case _ => None
     }
   }
 
   def combineNodeLoads(list1: List[NodeLoad], list2: List[NodeLoad]): List[NodeLoad] =
     (list1 ++ list2).groupBy(_.node).map { case (node, nodes) => NodeLoad(node, nodes.map(_.jobsWeight).sum) }.toList
+
+  def canNodeHandle(nodeCurrentWeight: Int, jobWeight: Int, maxWeightPerNode: Int): Boolean =
+    (nodeCurrentWeight + Math.max(jobWeight, maxWeightPerNode)) <= maxWeightPerNode
 }
