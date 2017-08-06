@@ -40,5 +40,5 @@ object NodeLoadBalancer {
     (list1 ++ list2).groupBy(_.node).map { case (node, nodes) => NodeLoad(node, nodes.map(_.jobsWeight).sum) }.toList
 
   def canNodeHandle(nodeCurrentWeight: Int, jobWeight: Int, maxWeightPerNode: Int): Boolean =
-    (nodeCurrentWeight + Math.max(jobWeight, maxWeightPerNode)) <= maxWeightPerNode
+    (nodeCurrentWeight + Math.min(jobWeight, maxWeightPerNode)) <= maxWeightPerNode
 }
