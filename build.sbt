@@ -1,4 +1,4 @@
-name := "JobForce"
+name := "TaskForce"
 
 version := "1.0"
 
