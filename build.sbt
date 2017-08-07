@@ -2,7 +2,7 @@ name := "JobForce"
 
 version := "1.0"
 
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.3"
 
 val catsVersion = "0.9.0"
 val scalacheckVersion = "1.13.5"
