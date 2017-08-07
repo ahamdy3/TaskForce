@@ -1,4 +1,4 @@
-package io.ahamdy.jobforce.db
+package io.ahamdy.jobforce.store
 
 import java.time.ZonedDateTime
 
@@ -7,7 +7,7 @@ import io.ahamdy.jobforce.domain._
 
 
 trait JobsStore {
-  def getQueuedJobs: Task[List[QueuedJob]]
+  def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]]
   def getRunningJobs: Task[List[RunningJob]]
   def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]]
   def getFinishedJobs: Task[List[FinishedJob]]
@@ -21,5 +21,5 @@ trait JobsStore {
   def moveRunningJobToQueuedJob(queuedJob: QueuedJob): Task[Unit]
   def moveRunningJobToFinishedJob(finishedJob: FinishedJob): Task[Unit]
 
-  def getJobLastRunTime(lock: JobLock): Task[Option[ZonedDateTime]]
+  def getJobLastRunTime(id: JobId): Task[Option[ZonedDateTime]]
 }

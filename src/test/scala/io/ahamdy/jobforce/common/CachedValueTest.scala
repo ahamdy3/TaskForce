@@ -13,7 +13,7 @@ class CachedValueTest extends StandardSpec {
   "CachedValue" should {
     "value should cache values during TTL" in {
       val now = ZonedDateTime.now()
-      val dummyTime = new MutableTime(now)
+      val dummyTime = new DummyTime(now)
       val accessCounter = new AtomicInteger()
       val source = Task.delay(accessCounter.incrementAndGet())
 
