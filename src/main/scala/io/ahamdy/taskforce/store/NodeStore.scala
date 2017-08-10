@@ -9,7 +9,13 @@ trait NodeStore {
     getAllNodes.map(_.filter(_.nodeGroup == groupName))
   def getAllActiveNodesByGroup(groupName: NodeGroup): Task[List[JobNode]] =
     getAllNodesByGroup(groupName).map(_.filter(_.active.value))
+  def getAllActiveNodesCountByGroup(groupName: NodeGroup): Task[Int] =
+    getAllNodesByGroup(groupName).map(_.length)
+  def getYoungestActiveNodesByGroup(groupName: NodeGroup, count: Int = 1): Task[List[JobNode]] =
+    getAllNodesByGroup(groupName).map(_.filter(_.active.value)
+      .sortBy(_.startTime.toInstant.getEpochSecond).takeRight(count))
   def updateHeartbeat(nodeGroup: NodeGroup, nodeId: NodeId): Task[Unit] = Task.now(())
 
+  def updateNodeStatus(nodeId: NodeId, active: NodeActive): Task[Unit]
   def updateGroupNodesStatus(nodeGroup: NodeGroup, active: NodeActive): Task[Unit]
 }

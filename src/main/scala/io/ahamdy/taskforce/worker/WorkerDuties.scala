@@ -6,10 +6,10 @@ import cats.syntax.either._
 import cats.syntax.flatMap._
 import fs2.interop.cats._
 import fs2.{Strategy, Task}
+import io.ahamdy.taskforce.api.NodeInfoProvider
 import io.ahamdy.taskforce.common.Logging
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain._
-import io.ahamdy.taskforce.shared.NodeInfoProvider
 import io.ahamdy.taskforce.store.{JobsStore, NodeStore}
 import io.ahamdy.taskforce.syntax.task._
 

@@ -3,10 +3,11 @@ package io.ahamdy.taskforce.leader
 import java.time.{ZoneId, ZonedDateTime}
 
 import com.cronutils.model.CronType
+import io.ahamdy.taskforce.api.NodeInfoProvider
 import io.ahamdy.taskforce.common.DummyTime
 import io.ahamdy.taskforce.domain._
 import io.ahamdy.taskforce.scheduling.{CronLine, DummyJobsScheduleProvider, JobsScheduleProvider}
-import io.ahamdy.taskforce.shared.{DummyNodeInfoProvider, NodeInfoProvider}
+import io.ahamdy.taskforce.shared.DummyNodeInfoProvider
 import io.ahamdy.taskforce.store.{DummyJobStore, DummyNodeStore, JobsStore, NodeStore}
 import io.ahamdy.taskforce.testing.syntax.either._
 import io.ahamdy.taskforce.common.Time
