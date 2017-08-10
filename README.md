@@ -22,3 +22,4 @@ Features:
 - Support dependent jobs (Job start only after another job finish)
 - Job priority
 - Auto Scaling
+- Graceful shutdown

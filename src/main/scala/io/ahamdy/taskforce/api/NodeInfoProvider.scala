@@ -1,4 +1,4 @@
-package io.ahamdy.taskforce.shared
+package io.ahamdy.taskforce.api
 
 import io.ahamdy.taskforce.domain.{NodeGroup, NodeId}
 

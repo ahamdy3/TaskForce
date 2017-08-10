@@ -9,6 +9,7 @@ import io.ahamdy.taskforce.domain._
 trait JobsStore {
   def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]]
   def getRunningJobs: Task[List[RunningJob]]
+  def getRunningJobsGroupName(nodeGroup: NodeGroup): Task[List[RunningJob]]
   def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]]
   def getFinishedJobs: Task[List[FinishedJob]]
 

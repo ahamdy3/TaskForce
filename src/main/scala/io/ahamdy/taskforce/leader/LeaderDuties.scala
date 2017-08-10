@@ -8,9 +8,9 @@ import fs2.Task
 import fs2.interop.cats._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
+import io.ahamdy.taskforce.api.{CloudManager, NodeInfoProvider}
 import io.ahamdy.taskforce.domain._
 import io.ahamdy.taskforce.scheduling.JobsScheduleProvider
-import io.ahamdy.taskforce.shared.NodeInfoProvider
 import io.ahamdy.taskforce.store.{JobsStore, NodeStore}
 import io.ahamdy.taskforce.implicits._
 import io.ahamdy.taskforce.leader.components.{JobDueChecker, NodeLoadBalancer}
@@ -32,7 +32,8 @@ trait LeaderDuties {
 }
 
 class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfoProvider,
-                       jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobsStore, time: Time)
+                       jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobsStore,
+                       cloudManager: CloudManager, time: Time)
   extends LeaderDuties with Logging {
 
   val startTime: ZonedDateTime = time.unsafeNow()
@@ -63,7 +64,7 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
         }
       }
     else
-      nodeStore.getAllNodes.map(_.find(_.nodeId == nodeInfoProvider.nodeId)).flatMap{
+      nodeStore.getAllNodes.map(_.find(_.nodeId == nodeInfoProvider.nodeId)).flatMap {
         case Some(leaderNode) if !leaderNode.active.value => gracefulShutdown.as(())
       }
 
@@ -172,7 +173,9 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
       for {
         _ <- nodeStore.updateGroupNodesStatus(nodeInfoProvider.nodeGroup, NodeActive(false))
         _ <- Task.delay(groupActiveFlag.set(false))
-        readyToShutdown <- Task.delay(runningJobs.isEmpty)
+        readyToShutdown <-
+        if (isLeader) Task.delay(runningJobs.isEmpty)
+        else jobsStore.getRunningJobsGroupName(nodeInfoProvider.nodeGroup).map(_.isEmpty)
       } yield readyToShutdown
     else
       Task.delay(runningJobs.isEmpty)
@@ -188,6 +191,6 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
 }
 
 case class TaskForceLeaderConfig(minActiveNodes: Int,
-                                maxWeightPerNode: Int,
-                                youngestLeaderAge: FiniteDuration,
-                                leaderAlsoWorker: Boolean)
+                                 maxWeightPerNode: Int,
+                                 youngestLeaderAge: FiniteDuration,
+                                 leaderAlsoWorker: Boolean)
