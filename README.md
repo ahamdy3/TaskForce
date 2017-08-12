@@ -12,13 +12,10 @@ Features:
 - Fault tolerant
 - Load balanced
 - Support chained jobs
-- Dynamic job weight
-- Dynamic retrials
-- Leader/Worker design
-- Modular so every part can be replaced with different implementation
+- Dynamic job weighting
+- customizable retrial mechanism per job
 - Worker multi-version support for rolling updates
 - Start job after another (big jobs can be divided into smaller sequential jobs (steps))
-- Big jobs can be divided into parallel distributed smaller jobs
-- Support dependent jobs (Job start only after another job finish)
+- Jobs can be divided into parallel distributed smaller jobs
 - Job priority
-- Auto Scaling
+- Auto Scaling (using cloud APIs)
