@@ -5,5 +5,5 @@ import io.ahamdy.taskforce.domain.NodeId
 
 trait CloudManager {
   def scaleUp(nodesCount: Int): Task[Unit]
-  def scaleDown(nodeIds: List[NodeId]): Task[Unit]
+  def scaleDown(nodeIds: Set[NodeId]): Task[Unit]
 }

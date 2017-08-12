@@ -113,7 +113,7 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
               NodeLoadBalancer.leastLoadedNode(runningJobs.values().asScala.toList, allActiveNodes, queuedJob.versionRule,
                 nodeInfoProvider.nodeId, config.leaderAlsoWorker, counter) match {
                 case Some(nodeLoad) if NodeLoadBalancer.canNodeHandle(nodeLoad.jobsWeight, queuedJob.weight.value, config.maxWeightPerNode) =>
-                  val runningJob = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, now)
+                  val runningJob = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, nodeLoad.node.nodeGroup, now)
                   jobsStore.moveQueuedJobToRunningJob(runningJob) >>
                     Task.delay(queuedJobs.remove(runningJob.id)) >>
                     Task.delay(runningJobs.put(runningJob.lock, runningJob)).as(counter)
@@ -175,7 +175,7 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
         _ <- Task.delay(groupActiveFlag.set(false))
         readyToShutdown <-
         if (isLeader) Task.delay(runningJobs.isEmpty)
-        else jobsStore.getRunningJobsGroupName(nodeInfoProvider.nodeGroup).map(_.isEmpty)
+        else jobsStore.getRunningJobsByGroupName(nodeInfoProvider.nodeGroup).map(_.isEmpty)
       } yield readyToShutdown
     else
       Task.delay(runningJobs.isEmpty)

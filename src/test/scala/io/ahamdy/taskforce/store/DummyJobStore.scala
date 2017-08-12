@@ -68,4 +68,7 @@ class DummyJobStore(time: Time) extends JobsStore {
   }
 
   def isEmpty: Boolean = queuedJobStore.isEmpty && runningJobStore.isEmpty && finishedJobStore.isEmpty
+
+  override def getRunningJobsByGroupName(nodeGroup: NodeGroup): Task[List[RunningJob]] =
+    getRunningJobs.map(_.filter(job => job.nodeGroup == nodeGroup))
 }

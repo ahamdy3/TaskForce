@@ -3,11 +3,10 @@ package io.ahamdy.taskforce.leader
 import java.time.{ZoneId, ZonedDateTime}
 
 import com.cronutils.model.CronType
-import io.ahamdy.taskforce.api.NodeInfoProvider
+import io.ahamdy.taskforce.api.{CloudManager, DummyCloudManager, DummyNodeInfoProvider, NodeInfoProvider}
 import io.ahamdy.taskforce.common.DummyTime
 import io.ahamdy.taskforce.domain._
 import io.ahamdy.taskforce.scheduling.{CronLine, DummyJobsScheduleProvider, JobsScheduleProvider}
-import io.ahamdy.taskforce.shared.DummyNodeInfoProvider
 import io.ahamdy.taskforce.store.{DummyJobStore, DummyNodeStore, JobsStore, NodeStore}
 import io.ahamdy.taskforce.testing.syntax.either._
 import io.ahamdy.taskforce.common.Time
@@ -41,12 +40,14 @@ class LeaderDutiesImplTest extends StandardSpec {
   val jobsScheduleProvider = new DummyJobsScheduleProvider
   val nodeStore = new DummyNodeStore(dummyTime)
   val jobStore = new DummyJobStore(dummyTime)
+  val cloudManager = new DummyCloudManager(initialNodesCount = 3)
 
   def createNewLeader(config: TaskForceLeaderConfig = config,
                       nodeInfoProvider: NodeInfoProvider = node1InfoProvider,
                       jobsScheduleProvider: JobsScheduleProvider = jobsScheduleProvider,
                       nodeStore: NodeStore = nodeStore,
                       jobsStore: JobsStore = jobStore,
+                      cloudManager: CloudManager = cloudManager,
                       time: Time = dummyTime) =
     new LeaderDutiesImpl(
       config,
@@ -54,6 +55,7 @@ class LeaderDutiesImplTest extends StandardSpec {
       jobsScheduleProvider,
       nodeStore,
       jobsStore,
+      cloudManager,
       time
     )
 
@@ -89,7 +91,7 @@ class LeaderDutiesImplTest extends StandardSpec {
       jobStore.queuedJobStore.put(queuedJob.id, queuedJob)
 
       val runningJob = queuedJob.copy(id = JobId("job-id-3"))
-        .toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow())
+        .toRunningJobAndIncAttempts(NodeId("test-node-2"), NodeGroup("test-group-1"), dummyTime.unsafeNow())
       jobStore.runningJobStore.put(runningJob.lock, runningJob)
 
       val leader = createNewLeader()
@@ -219,8 +221,10 @@ class LeaderDutiesImplTest extends StandardSpec {
       val queuedJob1 = scheduledJob1.toQueuedJob(dummyTime.unsafeNow())
       val queuedJob2 = scheduledJob2.toQueuedJob(dummyTime.unsafeNow())
 
-      val runningJob1 = queuedJob1.toRunningJobAndIncAttempts(NodeId("test-node-1"), dummyTime.unsafeNow())
-      val runningJob2 = queuedJob2.toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow())
+      val runningJob1 = queuedJob1.toRunningJobAndIncAttempts(NodeId("test-node-1"), NodeGroup("test-group-1"),
+        dummyTime.unsafeNow())
+      val runningJob2 = queuedJob2.toRunningJobAndIncAttempts(NodeId("test-node-2"), NodeGroup("test-group-1"),
+        dummyTime.unsafeNow())
 
       jobStore.reset()
       nodeStore.reset()
@@ -266,9 +270,9 @@ class LeaderDutiesImplTest extends StandardSpec {
     val queuedJob3 = scheduledJob3.toQueuedJob(dummyTime.unsafeNow())
 
     val runningJob1 = scheduledJob1.toQueuedJob(dummyTime.unsafeNow())
-      .toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow()) // second highest priority
+      .toRunningJobAndIncAttempts(NodeId("test-node-2"), NodeGroup("test-group-1"), dummyTime.unsafeNow()) // second highest priority
     val runningJob4 = scheduledJob4.toQueuedJob(dummyTime.unsafeNow())
-      .toRunningJobAndIncAttempts(NodeId("test-node-1"), dummyTime.unsafeNow()) // highest priority
+      .toRunningJobAndIncAttempts(NodeId("test-node-1"), NodeGroup("test-group-1"), dummyTime.unsafeNow()) // highest priority
 
     jobsScheduleProvider.scheduledJobs.append(
       scheduledJob1,
@@ -312,9 +316,12 @@ class LeaderDutiesImplTest extends StandardSpec {
       val queuedJob2 = scheduledJob2.toQueuedJob(dummyTime.unsafeNow())
       val queuedJob3 = scheduledJob3.toQueuedJob(dummyTime.unsafeNow())
 
-      val runningJob1 = queuedJob1.toRunningJobAndIncAttempts(NodeId("test-node-1"), dummyTime.unsafeNow())
-      val runningJob2 = queuedJob2.toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow())
-      val runningJob3 = queuedJob3.toRunningJobAndIncAttempts(NodeId("test-node-2"), dummyTime.unsafeNow())
+      val runningJob1 = queuedJob1.toRunningJobAndIncAttempts(NodeId("test-node-1"), NodeGroup("test-group-1"),
+        dummyTime.unsafeNow())
+      val runningJob2 = queuedJob2.toRunningJobAndIncAttempts(NodeId("test-node-2"), NodeGroup("test-group-1"),
+        dummyTime.unsafeNow())
+      val runningJob3 = queuedJob3.toRunningJobAndIncAttempts(NodeId("test-node-2"), NodeGroup("test-group-1"),
+        dummyTime.unsafeNow())
 
       jobStore.runningJobStore.put(runningJob1.lock, runningJob1)
       jobStore.runningJobStore.put(runningJob2.lock, runningJob2)
