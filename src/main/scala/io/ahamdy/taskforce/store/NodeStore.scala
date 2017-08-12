@@ -12,12 +12,17 @@ trait NodeStore {
     getAllNodes.map(_.filter(_.nodeGroup == groupName))
   def getAllActiveNodesByGroup(groupName: NodeGroup): Task[List[JobNode]] =
     getAllNodesByGroup(groupName).map(_.filter(_.active.value))
-  def getAllInactiveNodesByGroup(groupName: NodeGroup): Task[List[JobNode]] =
-    getAllNodesByGroup(groupName).map(_.filterNot(_.active.value))
   def getAllActiveNodesCountByGroup(groupName: NodeGroup): Task[Int] =
-    getAllNodesByGroup(groupName).map(_.length)
+    getAllActiveNodesByGroup(groupName).map(_.length)
+  def getAllInactiveNodesByGroup(groupName: NodeGroup): Task[List[JobNode]] =
+  getAllNodesByGroup(groupName).map(_.filterNot(_.active.value))
   def getYoungestActiveNodesByGroup(groupName: NodeGroup, count: Int = 1): Task[List[JobNode]] =
     getAllNodesByGroup(groupName).map(_.filter(_.active.value)
-      .sortBy(_.startTime.toInstant.getEpochSecond).takeRight(count))
+      .sortBy(node => (node.startTime.toInstant.getEpochSecond, node.nodeId.value)).takeRight(count))
+  def getOldestActiveNonLeaderNodesByGroup(groupName: NodeGroup, count: Int = 1): Task[List[JobNode]] =
+    getAllNodesByGroup(groupName).map(_.filter(_.active.value)
+      .sortBy(node =>
+        (node.startTime.toInstant.getEpochSecond, node.nodeId.value))(Ordering.Tuple2(Ordering.Long.reverse, Ordering.String))
+      .drop(1).takeRight(count))
   def updateHeartbeat(nodeGroup: NodeGroup, nodeId: NodeId): Task[Unit] = Task.now(())
 }

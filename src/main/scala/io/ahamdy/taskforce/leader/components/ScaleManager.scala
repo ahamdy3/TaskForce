@@ -77,12 +77,13 @@ class ScaleManagerImpl(config: ScaleManagerConfig, cloudManager: CloudManager, n
   def scaleDownIfDue(now: ZonedDateTime): Task[Unit] =
     scaleDownNeededSince.get match {
       case None => Task.delay(scaleDownNeededSince.set(Some(now)))
-      case Some(scaleDownNeededTime) if now.minus(scaleDownNeededTime) > config.evaluationPeriod =>
+      case Some(scaleDownNeededTime) if now.minus(scaleDownNeededTime) >= config.evaluationPeriod =>
         nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup).flatMap {
           case nodesCount if nodesCount > config.minNodes =>
-            nodeStore.getYoungestActiveNodesByGroup(nodeInfoProvider.nodeGroup, Math.min(config.scaleDownStep, nodesCount - config.minNodes))
-              .map(_.map(node => nodeStore.updateNodeStatus(node.nodeId, NodeActive(false))))
-              .flatMap(sequenceUnit) >>
+            (for {
+              nodes <- nodeStore.getYoungestActiveNodesByGroup(nodeInfoProvider.nodeGroup, Math.min(config.scaleDownStep, nodesCount - config.minNodes))
+              _ <- sequenceUnit(nodes.map(node => nodeStore.updateNodeStatus(node.nodeId, NodeActive(false))))
+            } yield ()) >>
               Task.delay(lastScaleActivity.set(now)) >>
               Task.delay(scaleDownNeededSince.set(None))
           case _ => Task.unit
