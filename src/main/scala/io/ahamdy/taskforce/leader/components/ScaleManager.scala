@@ -27,12 +27,22 @@ class ScaleManagerImpl(config: ScaleManagerConfig, cloudManager: CloudManager, n
   val scaleUpNeededSince: AtomicReference[Option[ZonedDateTime]] = new AtomicReference(None)
   val scaleDownNeededSince: AtomicReference[Option[ZonedDateTime]] = new AtomicReference(None)
 
+  /**
+    * Effects:
+    * 1- set scaleDownNeededSince to None
+    * 2- set scaleUpNeededSince to None
+    *
+    * @param queuedAndRunningWeights
+    * @param activeNodesCapacity
+    * @return
+    */
+
   override def scaleCluster(queuedAndRunningWeights: Int, activeNodesCapacity: Int): Task[Unit] = {
     time.now.flatMap { now =>
-      if (now.minus(lastScaleActivity.get()) > config.coolDownPeriod)
-        if ((queuedAndRunningWeights / activeNodesCapacity) > config.scaleUpThreshold)
+      if (now.minus(lastScaleActivity.get()) >= config.coolDownPeriod)
+        if ((queuedAndRunningWeights / activeNodesCapacity.toDouble) * 100 > config.scaleUpThreshold)
           Task.delay(scaleDownNeededSince.set(None)) >> scaleUpIfDue(now)
-        else if ((queuedAndRunningWeights / activeNodesCapacity) < config.scaleDownThreshold)
+        else if ((queuedAndRunningWeights / activeNodesCapacity.toDouble) * 100 < config.scaleDownThreshold)
           Task.delay(scaleUpNeededSince.set(None)) >> scaleDownIfDue(now)
         else
           Task.delay(scaleUpNeededSince.set(None)) >> Task.delay(scaleDownNeededSince.set(None))
@@ -54,7 +64,6 @@ class ScaleManagerImpl(config: ScaleManagerConfig, cloudManager: CloudManager, n
     * 2- set scaleUpNeededSince to Some(now)
     * 3- set lastScaleActivity to now
     * 4- scale up cluster
-    * 5- do nothing!
     *
     * @param now current ZonedDateTime
     * @return

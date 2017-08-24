@@ -1,7 +1,9 @@
 package io.ahamdy.taskforce.leader.components
 
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicInteger
 
+import fs2.Task
 import io.ahamdy.taskforce.api.{DummyCloudManager, DummyNodeInfoProvider}
 import io.ahamdy.taskforce.common.DummyTime
 import io.ahamdy.taskforce.domain._
@@ -220,12 +222,112 @@ class ScaleManagerTest extends StandardSpec {
       }
     }
 
-    "scaleCluster" in {
-      ok
+    "scaleCluster" should {
+      "set scaleDownNeededSince to None and call scaleUpIfDue only if coolDownPeriod has passed since lastScaleActivity" +
+        " and current queued and running jobs exceeded configured scaleUpThreshold of current active nodes capacity" in {
+        val time = new DummyTime(ZonedDateTime.now())
+        val cloudManager = new DummyCloudManager(initialNodesCount = 3)
+        val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
+        val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time) {
+          val scaleUpCounter = new AtomicInteger(0)
+          val scaleDownCounter = new AtomicInteger(0)
+          override def scaleUpIfDue(now: ZonedDateTime): Task[Unit] = Task.delay(scaleUpCounter.incrementAndGet())
+          override def scaleDownIfDue(now: ZonedDateTime): Task[Unit] = Task.delay(scaleDownCounter.incrementAndGet())
+        }
+
+        scaleManager.lastScaleActivity.set(time.unsafeNow())
+        scaleManager.scaleCluster(queuedAndRunningWeights = 90, activeNodesCapacity = 100) must beSucceedingTask // more than 80%
+
+        scaleManager.scaleUpCounter.get mustEqual 0
+        scaleManager.scaleDownCounter.get mustEqual 0
+
+        scaleManager.scaleDownNeededSince.set(Some(time.unsafeNow()))
+        scaleManager.lastScaleActivity.set(time.unsafeNow().minus(config.coolDownPeriod))
+        scaleManager.scaleCluster(queuedAndRunningWeights = 90, activeNodesCapacity = 100) must beSucceedingTask // more than 80%
+
+        scaleManager.scaleUpCounter.get mustEqual 1
+        scaleManager.scaleDownCounter.get mustEqual 0
+        scaleManager.scaleDownNeededSince.get must beNone
+      }
+
+      "set scaleUpNeededSince to None and call scaleDownIfDue only if coolDownPeriod has passed since lastScaleActivity" +
+        " and current queued and running jobs are less than configured scaleDownThreshold of current active nodes capacity" in {
+        val time = new DummyTime(ZonedDateTime.now())
+        val cloudManager = new DummyCloudManager(initialNodesCount = 3)
+        val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
+        val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time) {
+          val scaleUpCounter = new AtomicInteger(0)
+          val scaleDownCounter = new AtomicInteger(0)
+          override def scaleUpIfDue(now: ZonedDateTime): Task[Unit] = Task.delay(scaleUpCounter.incrementAndGet())
+          override def scaleDownIfDue(now: ZonedDateTime): Task[Unit] = Task.delay(scaleDownCounter.incrementAndGet())
+        }
+
+        scaleManager.lastScaleActivity.set(time.unsafeNow())
+        scaleManager.scaleCluster(queuedAndRunningWeights = 10, activeNodesCapacity = 100) must beSucceedingTask // less than 30%
+
+        scaleManager.scaleUpCounter.get mustEqual 0
+        scaleManager.scaleDownCounter.get mustEqual 0
+
+        scaleManager.scaleUpNeededSince.set(Some(time.unsafeNow()))
+        scaleManager.lastScaleActivity.set(time.unsafeNow().minus(config.coolDownPeriod))
+        scaleManager.scaleCluster(queuedAndRunningWeights = 10, activeNodesCapacity = 100) must beSucceedingTask // less than 30%
+
+        scaleManager.scaleUpCounter.get mustEqual 0
+        scaleManager.scaleDownCounter.get mustEqual 1
+        scaleManager.scaleUpNeededSince.get must beNone
+      }
+
+      "set scaleDownNeededSince and scaleUpNeededSince to None if current queued and running jobs are in between " +
+        "configured scaleDownThreshold and scaleIpThreshold of current active nodes capacity" in {
+        val time = new DummyTime(ZonedDateTime.now())
+        val cloudManager = new DummyCloudManager(initialNodesCount = 3)
+        val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
+        val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time) {
+          val scaleUpCounter = new AtomicInteger(0)
+          val scaleDownCounter = new AtomicInteger(0)
+          override def scaleUpIfDue(now: ZonedDateTime): Task[Unit] = Task.delay(scaleUpCounter.incrementAndGet())
+          override def scaleDownIfDue(now: ZonedDateTime): Task[Unit] = Task.delay(scaleDownCounter.incrementAndGet())
+        }
+
+        scaleManager.scaleUpNeededSince.set(Some(time.unsafeNow()))
+        scaleManager.scaleDownNeededSince.set(Some(time.unsafeNow()))
+        scaleManager.scaleCluster(queuedAndRunningWeights = 40, activeNodesCapacity = 100) must beSucceedingTask // between 30% and 80%
+
+        scaleManager.scaleUpCounter.get mustEqual 0
+        scaleManager.scaleDownCounter.get mustEqual 0
+        scaleManager.scaleUpNeededSince.get must beNone
+        scaleManager.scaleDownNeededSince.get must beNone
+      }
     }
 
-    "cleanInactiveNodes" in {
-      ok
+    "cleanInactiveNodes" should {
+      "scale down nodes marked as inactive only when they finished all jobs running on them" in {
+        val time = new DummyTime(ZonedDateTime.now())
+        val cloudManager = new DummyCloudManager(initialNodesCount = 4)
+        val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
+        val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time)
+
+        val nodesList = List(
+          JobNode(NodeId("test-node-1"), NodeGroup("test-group"), time.unsafeNow().minusMinutes(3), NodeActive(true), NodeVersion("1.0.0")),
+          JobNode(NodeId("test-node-2"), NodeGroup("test-group"), time.unsafeNow().minusMinutes(2), NodeActive(true), NodeVersion("1.0.0")),
+          JobNode(NodeId("test-node-3"), NodeGroup("test-group"), time.unsafeNow().minusMinutes(2), NodeActive(false), NodeVersion("1.0.0")),
+          JobNode(NodeId("test-node-4"), NodeGroup("test-group"), time.unsafeNow().minusMinutes(1), NodeActive(false), NodeVersion("1.0.0"))
+        )
+
+        nodeStore.nodesList.set(nodesList)
+
+        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"), NodeId("test-node-3"), NodeId("test-node-4"))) must beSucceedingTask
+        cloudManager.scaledDownNodes.get must beEmpty
+
+        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"), NodeId("test-node-3"))) must beSucceedingTask
+        cloudManager.scaledDownNodes.get mustEqual Set(NodeId("test-node-4"))
+
+        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"))) must beSucceedingTask
+        cloudManager.scaledDownNodes.get mustEqual Set(NodeId("test-node-4"), NodeId("test-node-3"))
+
+        scaleManager.cleanInactiveNodes(Set.empty) must beSucceedingTask
+        cloudManager.scaledDownNodes.get mustEqual Set(NodeId("test-node-4"), NodeId("test-node-3"))
+      }
     }
 
   }
