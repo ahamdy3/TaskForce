@@ -10,6 +10,7 @@ import io.ahamdy.taskforce.scheduling.{CronLine, DummyJobsScheduleProvider, Jobs
 import io.ahamdy.taskforce.store.{DummyJobStore, DummyNodeStore, JobsStore, NodeStore}
 import io.ahamdy.taskforce.testing.syntax.either._
 import io.ahamdy.taskforce.common.Time
+import io.ahamdy.taskforce.leader.components.{DummyScaleManager, ScaleManager}
 import io.ahamdy.taskforce.testing.StandardSpec
 
 import scala.collection.JavaConverters._
@@ -40,22 +41,22 @@ class LeaderDutiesImplTest extends StandardSpec {
   val jobsScheduleProvider = new DummyJobsScheduleProvider
   val nodeStore = new DummyNodeStore(dummyTime)
   val jobStore = new DummyJobStore(dummyTime)
-  val cloudManager = new DummyCloudManager(initialNodesCount = 3)
+  val scaleManager = new DummyScaleManager
 
   def createNewLeader(config: TaskForceLeaderConfig = config,
-                      nodeInfoProvider: NodeInfoProvider = node1InfoProvider,
-                      jobsScheduleProvider: JobsScheduleProvider = jobsScheduleProvider,
-                      nodeStore: NodeStore = nodeStore,
-                      jobsStore: JobsStore = jobStore,
-                      cloudManager: CloudManager = cloudManager,
-                      time: Time = dummyTime) =
+    nodeInfoProvider: NodeInfoProvider = node1InfoProvider,
+    jobsScheduleProvider: JobsScheduleProvider = jobsScheduleProvider,
+    nodeStore: NodeStore = nodeStore,
+    jobsStore: JobsStore = jobStore,
+    scaleManager: ScaleManager = scaleManager,
+    time: Time = dummyTime) =
     new LeaderDutiesImpl(
       config,
       nodeInfoProvider,
       jobsScheduleProvider,
       nodeStore,
       jobsStore,
-      cloudManager,
+      scaleManager,
       time
     )
 
