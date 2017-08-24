@@ -12,7 +12,7 @@ trait Db {
   def runCommand[A](command: ConnectionIO[A]): Task[A]
 }
 
-class DbImpl(transactor: Transactor[IOLite]) extends Db {
+/*class DbImpl(transactor: Transactor[IOLite]) extends Db {
   def runCommand[A](command: ConnectionIO[A]): Task[A] = Task.delay(command.transact(transactor).unsafePerformIO)
 }
 
@@ -41,7 +41,7 @@ object Db {
     new Flyway() {
       setDataSource(dataSource)
     }.migrate()
-}
+}*/
 
 case class DbConfig(
   hostname: String,

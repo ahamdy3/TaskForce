@@ -11,7 +11,7 @@ import org.specs2.specification.{AfterAll, AfterEach}
 trait DatabaseSpec extends AfterAll with AfterEach with SpecificationStructure with ArgumentsDsl {
   this: ArgumentsShortcuts =>
 
-  override def map(s: SpecStructure): SpecStructure =
+  /*override def map(s: SpecStructure): SpecStructure =
     super.map(s.copy(arguments = s.arguments.overrideWith(Arguments("sequential"))))
 
   val databaseName = "psa"
@@ -52,5 +52,5 @@ trait DatabaseSpec extends AfterAll with AfterEach with SpecificationStructure w
 
   override def afterAll: Unit = service.stop()
 
-  override def after: Unit = unsafeTruncateTables()
+  override def after: Unit = unsafeTruncateTables()*/
 }

@@ -329,8 +329,6 @@ class ScaleManagerTest extends StandardSpec {
         cloudManager.scaledDownNodes.get mustEqual Set(NodeId("test-node-4"), NodeId("test-node-3"))
       }
     }
-
   }
-
 
 }

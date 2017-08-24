@@ -13,7 +13,7 @@ import io.ahamdy.taskforce.domain._
 import io.ahamdy.taskforce.scheduling.JobsScheduleProvider
 import io.ahamdy.taskforce.store.{JobsStore, NodeStore}
 import io.ahamdy.taskforce.implicits._
-import io.ahamdy.taskforce.leader.components.{JobDueChecker, NodeLoadBalancer}
+import io.ahamdy.taskforce.leader.components.{JobDueChecker, NodeLoadBalancer, ScaleManager}
 import io.ahamdy.taskforce.common.{Logging, Time}
 
 import scala.collection.JavaConverters._
@@ -32,8 +32,8 @@ trait LeaderDuties {
 }
 
 class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfoProvider,
-                       jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobsStore,
-                       cloudManager: CloudManager, time: Time)
+  jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobsStore,
+  scaleManager: ScaleManager, time: Time)
   extends LeaderDuties with Logging {
 
   val startTime: ZonedDateTime = time.unsafeNow()
@@ -165,7 +165,11 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
     }
 
   override def scaleCluster: Task[Unit] = onlyIfLeader {
-    ???
+    val queuedJobsWeight = queuedJobs.values().asScala.map(_.weight.value).sum
+    val runningJobsWeight = runningJobs.values().asScala.map(_.weight.value).sum
+    nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup).flatMap { activeNodesCount =>
+      scaleManager.scaleCluster(queuedJobsWeight + runningJobsWeight, activeNodesCount * config.maxWeightPerNode)
+    }
   }
 
   override def gracefulShutdown: Task[Boolean] =
@@ -191,6 +195,6 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
 }
 
 case class TaskForceLeaderConfig(minActiveNodes: Int,
-                                 maxWeightPerNode: Int,
-                                 youngestLeaderAge: FiniteDuration,
-                                 leaderAlsoWorker: Boolean)
+  maxWeightPerNode: Int,
+  youngestLeaderAge: FiniteDuration,
+  leaderAlsoWorker: Boolean)
