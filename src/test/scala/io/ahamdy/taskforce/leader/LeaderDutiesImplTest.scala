@@ -3,15 +3,15 @@ package io.ahamdy.taskforce.leader
 import java.time.{ZoneId, ZonedDateTime}
 
 import com.cronutils.model.CronType
-import io.ahamdy.taskforce.api.{CloudManager, DummyCloudManager, DummyNodeInfoProvider, NodeInfoProvider}
-import io.ahamdy.taskforce.common.DummyTime
+import io.ahamdy.taskforce.api.{DummyNodeInfoProvider, NodeInfoProvider}
+import io.ahamdy.taskforce.common.{DummyTime, Time}
 import io.ahamdy.taskforce.domain._
+import io.ahamdy.taskforce.leader.components.{DummyScaleManager, ScaleManager}
 import io.ahamdy.taskforce.scheduling.{CronLine, DummyJobsScheduleProvider, JobsScheduleProvider}
 import io.ahamdy.taskforce.store.{DummyJobStore, DummyNodeStore, JobsStore, NodeStore}
-import io.ahamdy.taskforce.testing.syntax.either._
-import io.ahamdy.taskforce.common.Time
-import io.ahamdy.taskforce.leader.components.{DummyScaleManager, ScaleManager}
 import io.ahamdy.taskforce.testing.StandardSpec
+import io.ahamdy.taskforce.testing.syntax.either._
+import io.ahamdy.taskforce.testing.syntax.scheduledJob._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -66,7 +66,7 @@ class LeaderDutiesImplTest extends StandardSpec {
     youngestLeaderAge = 10.second,
     leaderAlsoWorker = true)
 
-  "LeaderDutiesImpl.electClusterLeader" should {
+  "electClusterLeader" should {
     "elect oldest node as leader" in {
       jobStore.reset()
       val leader = createNewLeader()
@@ -127,7 +127,7 @@ class LeaderDutiesImplTest extends StandardSpec {
     }
   }
 
-  "LeaderDutiesImpl.refreshQueuedJobs" should {
+  "refreshQueuedJobs" should {
     "refresh QueuedJobs in leader cache and do nothing if not a leader" in {
       jobStore.reset()
       nodeStore.reset()
@@ -151,7 +151,7 @@ class LeaderDutiesImplTest extends StandardSpec {
     }
   }
 
-  "LeaderDutiesImpl.refreshJobsSchedule" should {
+  "refreshJobsSchedule" should {
     "refresh ScheduledJobs in leader cache only if leader or leaderIgnore flag is true" in {
       jobStore.reset()
       nodeStore.reset()
@@ -184,7 +184,7 @@ class LeaderDutiesImplTest extends StandardSpec {
     }
   }
 
-  "LeaderDutiesImpl.queueScheduledJobs" should {
+  "queueScheduledJobs" should {
     "queue due scheduled jobs only if leader and if the job is not already queued or running" in {
       jobStore.reset()
       nodeStore.reset()
@@ -211,7 +211,7 @@ class LeaderDutiesImplTest extends StandardSpec {
     }
   }
 
-  "LeaderDutiesImpl.assignQueuedJobs" should {
+  "assignQueuedJobs" should {
     "assign queued jobs to active nodes with respect to load balancing and version requirements" in {
 
       val scheduledJob1 = scheduledJob.copy(id = JobId("test-job1"), lock = JobLock("lock-1"),
@@ -294,7 +294,7 @@ class LeaderDutiesImplTest extends StandardSpec {
     jobStore.runningJobStore.values().asScala must containTheSameElementsAs(List(runningJob1, runningJob4))
   }
 
-  "LeaderDutiesImpl.cleanDeadNodesJobs" should {
+  "cleanDeadNodesJobs" should {
     "move running jobs back to queue only if they were running on dead node and attempts limit not reached," +
       "move running jobs to finished jobs if they were running on dead node and attempts limit has been reached" in {
       jobStore.reset()
@@ -355,6 +355,46 @@ class LeaderDutiesImplTest extends StandardSpec {
 
       leader.runningJobs.values().asScala must containTheSameElementsAs(List(runningJob1))
       jobStore.runningJobStore.values().asScala must containTheSameElementsAs(List(runningJob1))
+    }
+  }
+
+  "scaleCluster" should {
+    "call scaleManager only if leader and provide current queued and running jobs weight and current active nodes capacity" in {
+      jobStore.reset()
+      nodeStore.reset()
+      scaleManager.reset()
+      val nodeGroup = NodeGroup("test-group-1")
+
+      nodeStore.nodesList.set(List(
+        JobNode(NodeId("test-node-1"), nodeGroup, dummyTime.unsafeNow().minusSeconds(200), NodeActive(true), NodeVersion("1.0.0")),
+        JobNode(NodeId("test-node-2"), nodeGroup, dummyTime.unsafeNow().minusSeconds(2), NodeActive(true), NodeVersion("1.0.0")),
+        JobNode(NodeId("test-node-3"), nodeGroup, dummyTime.unsafeNow().minusMinutes(1), NodeActive(false), NodeVersion("1.0.0"))
+      ))
+
+      val queuedJob1 = scheduledJob.copy(id = JobId("job-id-1"), lock = JobLock("job-lock-1")).toQueuedJob(dummyTime)
+      val runningJob2 = scheduledJob.copy(id = JobId("job-id-2"), lock = JobLock("job-lock-2")).toRunningJob(NodeId("test-node-1"), nodeGroup, dummyTime)
+      val runningJob3 = scheduledJob.copy(id = JobId("job-id-3"), lock = JobLock("job-lock-3")).toRunningJob(NodeId("test-node-2"), nodeGroup, dummyTime)
+
+      jobStore.queuedJobStore.put(queuedJob1.id, queuedJob1)
+      jobStore.runningJobStore.put(runningJob2.lock, runningJob2)
+      jobStore.runningJobStore.put(runningJob3.lock, runningJob3)
+
+      val leader = createNewLeader()
+
+      scaleManager.lastReportedQueuedAndRunningWeights.get mustEqual 0
+      scaleManager.lastReportedActiveNodesCapacity.get mustEqual 0
+
+      leader.scaleCluster must beSucceedingTask
+      leader.isLeader must beFalse
+      scaleManager.lastReportedQueuedAndRunningWeights.get mustEqual 0
+      scaleManager.lastReportedActiveNodesCapacity.get mustEqual 0
+
+      leader.electClusterLeader must beSucceedingTask
+      leader.isLeader must beTrue
+      leader.scaleCluster must beSucceedingTask
+
+      scaleManager.lastReportedQueuedAndRunningWeights.get mustEqual scheduledJob.weight.value * 3
+      scaleManager.lastReportedActiveNodesCapacity.get mustEqual config.maxWeightPerNode * 2
     }
   }
 }
