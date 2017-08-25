@@ -167,8 +167,10 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
   override def scaleCluster: Task[Unit] = onlyIfLeader {
     val queuedJobsWeight = queuedJobs.values().asScala.map(_.weight.value).sum
     val runningJobsWeight = runningJobs.values().asScala.map(_.weight.value).sum
+
     nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup).flatMap { activeNodesCount =>
-      scaleManager.scaleCluster(queuedJobsWeight + runningJobsWeight, activeNodesCount * config.maxWeightPerNode)
+      val currentActiveNodeCapacity = activeNodesCount * config.maxWeightPerNode
+      scaleManager.scaleCluster(queuedJobsWeight + runningJobsWeight, currentActiveNodeCapacity)
     }
   }
 
