@@ -108,3 +108,12 @@ case class NodeLoad(node: JobNode, jobsWeight: Int)
 
 case class JobDataValidationException(msg: String) extends Exception(msg)
 case class RegisterError(jobType: JobType, message: String)
+case class JobErrorMessage(value: String) extends AnyVal
+
+sealed trait JobErrorDirective extends EnumEntry with EnumEntry.Lowercase
+object JobErrorDirective extends Enum[JobErrorDirective] {
+  case object Retry extends JobErrorDirective
+  case object Abort extends JobErrorDirective
+
+  val values: immutable.IndexedSeq[JobErrorDirective] = findValues
+}

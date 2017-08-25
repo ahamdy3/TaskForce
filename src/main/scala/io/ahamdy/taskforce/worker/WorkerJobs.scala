@@ -19,8 +19,8 @@ class WorkerJobsImpl(config: WorkerJobsConfig, workerDuties: WorkerDuties) exten
   override def start(): Unit = {
     scheduler.unsafeSchedule(config.runJobsPeriod, workerDuties.runAssignedJobs, resultHandler)
 
-    if(config.nodeStoreHeartbeat)
-      scheduler.unsafeSchedule(config.heartBeatPeriod, workerDuties.signalHeartbeat, resultHandler)
+/*    if(config.nodeStoreHeartbeat)
+      scheduler.unsafeSchedule(config.heartBeatPeriod, workerDuties.signalHeartbeat, resultHandler)*/
 
   }
 

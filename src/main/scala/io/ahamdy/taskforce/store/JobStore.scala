@@ -6,7 +6,7 @@ import fs2.Task
 import io.ahamdy.taskforce.domain._
 
 
-trait JobsStore {
+trait JobStore {
   def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]]
   def getRunningJobs: Task[List[RunningJob]]
   def getRunningJobsByGroupName(nodeGroup: NodeGroup): Task[List[RunningJob]]
