@@ -12,7 +12,7 @@ import io.ahamdy.taskforce.domain._
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-class DummyJobStore(time: Time) extends JobsStore {
+class DummyJobStore(time: Time) extends JobStore {
   val queuedJobStore = new ConcurrentHashMap[JobId, QueuedJob]()
   val runningJobStore = new ConcurrentHashMap[JobLock, RunningJob]()
   val finishedJobStore = new mutable.ArrayBuffer[FinishedJob]()

@@ -1,6 +1,7 @@
 package io.ahamdy.taskforce.worker
 
 import fs2.Task
+import io.ahamdy.taskforce.api.Worker
 import io.ahamdy.taskforce.domain._
 
 trait JobHandler {
@@ -14,8 +15,8 @@ trait JobHandler {
     */
   def validateJobInput(data: Map[String, String]): Task[Map[String, String]]
 
-  def jobHandlerFunction(validData: Map[String, String], worker: UserApi): Task[Unit]
+  def jobHandlerFunction(validData: Map[String, String], worker: Worker): Task[Unit]
 
-  def errorHandler: PartialFunction[Throwable, Task[Unit]]
+  def errorHandler: PartialFunction[Throwable, (JobErrorDirective, JobErrorMessage)]
 
 }

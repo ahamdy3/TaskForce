@@ -4,17 +4,17 @@ import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
-import fs2.Task
-import fs2.interop.cats._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import io.ahamdy.taskforce.api.{CloudManager, NodeInfoProvider}
+import fs2.Task
+import fs2.interop.cats._
+import io.ahamdy.taskforce.api.NodeInfoProvider
+import io.ahamdy.taskforce.common.{Logging, Time}
 import io.ahamdy.taskforce.domain._
-import io.ahamdy.taskforce.scheduling.JobsScheduleProvider
-import io.ahamdy.taskforce.store.{JobsStore, NodeStore}
 import io.ahamdy.taskforce.implicits._
 import io.ahamdy.taskforce.leader.components.{JobDueChecker, NodeLoadBalancer, ScaleManager}
-import io.ahamdy.taskforce.common.{Logging, Time}
+import io.ahamdy.taskforce.scheduling.JobsScheduleProvider
+import io.ahamdy.taskforce.store.{JobStore, NodeStore}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
@@ -32,7 +32,7 @@ trait LeaderDuties {
 }
 
 class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfoProvider,
-  jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobsStore,
+  jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobStore,
   scaleManager: ScaleManager, time: Time)
   extends LeaderDuties with Logging {
 

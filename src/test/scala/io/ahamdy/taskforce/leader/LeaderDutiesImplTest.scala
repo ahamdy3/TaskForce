@@ -8,7 +8,7 @@ import io.ahamdy.taskforce.common.{DummyTime, Time}
 import io.ahamdy.taskforce.domain._
 import io.ahamdy.taskforce.leader.components.{DummyScaleManager, ScaleManager}
 import io.ahamdy.taskforce.scheduling.{CronLine, DummyJobsScheduleProvider, JobsScheduleProvider}
-import io.ahamdy.taskforce.store.{DummyJobStore, DummyNodeStore, JobsStore, NodeStore}
+import io.ahamdy.taskforce.store.{DummyJobStore, DummyNodeStore, JobStore, NodeStore}
 import io.ahamdy.taskforce.testing.StandardSpec
 import io.ahamdy.taskforce.testing.syntax.either._
 import io.ahamdy.taskforce.testing.syntax.scheduledJob._
@@ -47,7 +47,7 @@ class LeaderDutiesImplTest extends StandardSpec {
     nodeInfoProvider: NodeInfoProvider = node1InfoProvider,
     jobsScheduleProvider: JobsScheduleProvider = jobsScheduleProvider,
     nodeStore: NodeStore = nodeStore,
-    jobsStore: JobsStore = jobStore,
+    jobsStore: JobStore = jobStore,
     scaleManager: ScaleManager = scaleManager,
     time: Time = dummyTime) =
     new LeaderDutiesImpl(
