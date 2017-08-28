@@ -18,14 +18,14 @@ trait WorkerDuties extends Worker {
 
   def runAssignedJobs: Task[Unit]
 
-/*  def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): Task[Unit]
-  def finishJob(finishedJob: FinishedJob): Task[Unit]*/
+  /*  def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): Task[Unit]
+    def finishJob(finishedJob: FinishedJob): Task[Unit]*/
 
   // def signalHeartbeat: Task[Unit]
 }
 
 class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoProvider: NodeInfoProvider,
-                       nodeStore: NodeStore, jobHandlerRegister: JobHandlerRegister, time: Time, jobsStrategy: Strategy)
+  nodeStore: NodeStore, jobHandlerRegister: JobHandlerRegister, time: Time, jobsStrategy: Strategy)
   extends WorkerDuties with Logging {
 
   val localRunningJobs = new ConcurrentHashMap[JobId, RunningJob]()
@@ -37,7 +37,7 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoP
     if (runningJob.attempts.attempts < runningJob.attempts.maxAttempts.value)
       for {
         now <- time.now
-        _ <- queueJob(runningJob.toQueuedJob(now))
+        _ <- jobStore.moveRunningJobToQueuedJob(runningJob.toQueuedJob(now))
       } yield ()
     else
       for {
@@ -54,18 +54,19 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoP
     }
 
   def runAssignedJob(runningJob: RunningJob): Task[Unit] =
-    jobHandlerRegister.getJobHandler(runningJob.jobType) match {
-      case Some(handler) if !localRunningJobs.containsKey(runningJob.id) =>
-        runAssignedJobWithHandler(handler, runningJob).flatMap{
-          case Right(_) => time.now.flatMap(now => finishJob(runningJob.toFinishedJob(now, JobResult.Success)))
-          case Left((directive, errorMsg)) if directive == JobErrorDirective.Retry =>
-            requeueJob(runningJob, Some(JobResultMessage(errorMsg.value)))
-          case Left((directive, errorMsg)) if directive == JobErrorDirective.Abort =>
-            time.now.flatMap(now => finishJob(runningJob.toFinishedJob(now, JobResult.Failure, Some(JobResultMessage(errorMsg.value)))))
+    ifNotAlreadyRunning(runningJob.id) {
+      jobHandlerRegister.getJobHandler(runningJob.jobType) match {
+        case Some(handler) =>
+          runAssignedJobWithHandler(handler, runningJob).flatMap {
+            case Right(_) => time.now.flatMap(now => finishJob(runningJob.toFinishedJob(now, JobResult.Success)))
+            case Left((directive, errorMsg)) if directive == JobErrorDirective.Retry =>
+              requeueJob(runningJob, Some(JobResultMessage(errorMsg.value)))
+            case Left((directive, errorMsg)) if directive == JobErrorDirective.Abort =>
+              time.now.flatMap(now => finishJob(runningJob.toFinishedJob(now, JobResult.Failure, Some(JobResultMessage(errorMsg.value)))))
 
-        }
-      case Some(_) => Task.unit
-      case None => logError(s"${runningJob.jobType} has no registered job handler!")
+          }
+        case None => logError(s"${runningJob.jobType} has no registered job handler!")
+      }
     }
 
   def runAssignedJobWithHandler(jobHandler: JobHandler, job: RunningJob): Task[Either[(JobErrorDirective, JobErrorMessage), Unit]] = {
@@ -87,6 +88,12 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoP
       case Left(t) => Task.fail(t)
     }
   }
+
+  def ifNotAlreadyRunning(jobId: JobId)(jobTask: Task[Unit]): Task[Unit] =
+    if (!localRunningJobs.containsKey(jobId))
+      jobTask
+    else
+      Task.unit
 
   /*override def signalHeartbeat: Task[Unit] =
     nodeStore.updateHeartbeat(nodeInfoProvider.nodeGroup, nodeInfoProvider.nodeId)*/

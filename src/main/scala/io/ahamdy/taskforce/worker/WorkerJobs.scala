@@ -13,7 +13,7 @@ trait WorkerJobs {
 
 class WorkerJobsImpl(config: WorkerJobsConfig, workerDuties: WorkerDuties) extends WorkerJobs with Logging {
 
-  val cores = Runtime.getRuntime.availableProcessors()
+  private val cores = Runtime.getRuntime.availableProcessors()
   override val scheduler: Scheduler = new SchedulerImpl(SchedulerConfig(threadPoolSize = cores * config.threadPerCore))
 
   override def start(): Unit = {

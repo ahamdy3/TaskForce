@@ -10,6 +10,13 @@ trait TaskMatchers {
     (task.attempt.unsafeRun().isLeft, "Task didn't fail")
   }
 
+  def beFailingTask[A](t: Throwable): Matcher[Task[A]] = { (task: Task[A]) =>
+    task.attempt.unsafeRun() match {
+      case Left(err) => (err.getMessage == t.getMessage, s"Task is failing with $err not with expected: $t")
+      case Right(a) => (false, s"Task is not failing and returning value $a")
+    }
+  }
+
   def beSucceedingTask[A](value: A): Matcher[Task[A]] = { (task: Task[A]) =>
     task.attempt.unsafeRun() match {
       case Left(err) => (false, s"Task is failing with $err")
