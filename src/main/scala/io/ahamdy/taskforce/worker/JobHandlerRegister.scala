@@ -8,6 +8,7 @@ trait JobHandlerRegister {
   def jobHandlers: ConcurrentHashMap[JobType, JobHandler]
   def registerHandler(jobHandler: JobHandler): Either[RegisterError, Unit]
   def getJobHandler(jobType: JobType): Option[JobHandler]
+  def reset(): Unit
 }
 
 class JobHandlerRegisterImpl extends JobHandlerRegister {
@@ -21,4 +22,6 @@ class JobHandlerRegisterImpl extends JobHandlerRegister {
     }
 
   override def getJobHandler(jobType: JobType): Option[JobHandler] = Option(jobHandlers.get(jobType))
+
+  override def reset(): Unit = jobHandlers.clear()
 }
