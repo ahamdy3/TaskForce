@@ -3,17 +3,17 @@ package io.ahamdy.taskforce.db
 import javax.sql.DataSource
 import doobie.hikari.hikaritransactor.HikariTransactor
 import doobie.imports._
-import fs2.Task
+import cats.effect.IO
 import org.flywaydb.core.Flyway
 import org.postgresql.ds.PGSimpleDataSource
 
 /** Storage of data in a relational database */
 trait Db {
-  def runCommand[A](command: ConnectionIO[A]): Task[A]
+  def runCommand[A](command: ConnectionIO[A]): IO[A]
 }
 
 /*class DbImpl(transactor: Transactor[IOLite]) extends Db {
-  def runCommand[A](command: ConnectionIO[A]): Task[A] = Task.delay(command.transact(transactor).unsafePerformIO)
+  def runCommand[A](command: ConnectionIO[A]): IO[A] = IO(command.transact(transactor).unsafePerformIO)
 }
 
 object Db {

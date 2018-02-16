@@ -3,12 +3,12 @@ package io.ahamdy.taskforce.worker
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import fs2.Task
+import cats.effect.IO
 import io.ahamdy.taskforce.api.Worker
 import io.ahamdy.taskforce.common.Logging
 import io.ahamdy.taskforce.domain.{JobErrorDirective, JobErrorMessage, JobType}
 
-class DummyJobHandler(val jobType: JobType, validateFunction: Map[String, String] => Task[Map[String, String]] = Task.now)
+class DummyJobHandler(val jobType: JobType, validateFunction: Map[String, String] => IO[Map[String, String]] = IO.pure)
   extends JobHandler with Logging {
 
   val FAIL_WITH_RETRY = "FAIL_WITH_RETRY"
@@ -18,9 +18,9 @@ class DummyJobHandler(val jobType: JobType, validateFunction: Map[String, String
   val successfulRuns = new AtomicInteger()
   val failedRuns = new AtomicInteger()
 
-  override def validateJobInput(data: Map[String, String]): Task[Map[String, String]] = validateFunction(data)
+  override def validateJobInput(data: Map[String, String]): IO[Map[String, String]] = validateFunction(data)
 
-  override def jobHandlerFunction(validData: Map[String, String], worker: Worker): Task[Unit] = Task.delay{
+  override def jobHandlerFunction(validData: Map[String, String], worker: Worker): IO[Unit] = IO{
     totalRuns.incrementAndGet()
     logger.info(s"running test job handler with data $validData")
 

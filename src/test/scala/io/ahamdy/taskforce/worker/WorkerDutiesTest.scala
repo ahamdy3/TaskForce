@@ -79,7 +79,7 @@ class WorkerDutiesTest extends StandardSpec {
       val validData = Map("VALID" -> "VALID_DATA")
       val validationFunction = { data: Map[String, String] =>
         if(data.contains("VALID"))
-          Task.now(data)
+          IO.pure(data)
         else
           Task.fail(new Exception("fake INVALID test exception"))
       }

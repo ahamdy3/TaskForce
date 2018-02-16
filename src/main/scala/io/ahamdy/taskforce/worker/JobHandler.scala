@@ -1,6 +1,6 @@
 package io.ahamdy.taskforce.worker
 
-import fs2.Task
+import cats.effect.IO
 import io.ahamdy.taskforce.api.Worker
 import io.ahamdy.taskforce.domain._
 
@@ -13,9 +13,9 @@ trait JobHandler {
     * @param data
     * @return Success Task of validated data or failed Task with JobDataValidationException
     */
-  def validateJobInput(data: Map[String, String]): Task[Map[String, String]]
+  def validateJobInput(data: Map[String, String]): IO[Map[String, String]]
 
-  def jobHandlerFunction(validData: Map[String, String], worker: Worker): Task[Unit]
+  def jobHandlerFunction(validData: Map[String, String], worker: Worker): IO[Unit]
 
   def errorHandler: PartialFunction[Throwable, (JobErrorDirective, JobErrorMessage)]
 

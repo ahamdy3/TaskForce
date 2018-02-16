@@ -3,20 +3,20 @@ package io.ahamdy.taskforce.syntax
 import java.util.concurrent.{ExecutorService, Executors}
 
 import fs2.{Strategy, Task}
-import io.ahamdy.taskforce.syntax.task._
+import io.ahamdy.taskforce.syntax.IO._
 import io.ahamdy.taskforce.testing.StandardSpec
 import org.specs2.specification.AfterAll
 
 import scala.collection.mutable
 
-class TaskSyntaxTest extends StandardSpec with AfterAll {
+class IOSyntaxTest extends StandardSpec with AfterAll {
   val executor: ExecutorService =  Executors.newFixedThreadPool(5)
   implicit val strategy: Strategy = Strategy.fromExecutor(executor)
 
   "TaskSyntax" should {
-    "sequenceUnit should traverse a list of Task and return Task[Unit]" in {
+    "sequenceUnit should traverse a list of Task and return IO[Unit]" in {
       val mutableStringSet = mutable.Set.empty[String]
-      def createTask(msg: String) = Task.delay(mutableStringSet.add(msg))
+      def createTask(msg: String) = IO(mutableStringSet.add(msg))
 
       val taskList = List(
         createTask("task-1"),
@@ -29,14 +29,14 @@ class TaskSyntaxTest extends StandardSpec with AfterAll {
       mutableStringSet mustEqual Set("task-1", "task-2", "task-3")
     }
 
-    "sequenceUnit should return Task[Unit] if given an empty List[Task[_]]" in {
-      sequenceUnit(List.empty[Task[Unit]]) must beSucceedingTask(())
+    "sequenceUnit should return IO[Unit] if given an empty List[IO[_]]" in {
+      sequenceUnit(List.empty[IO[Unit]]) must beSucceedingTask(())
     }
 
-    "parallelSequenceUnit should traverse a list of Task and return Task[Unit] in parallel" in {
+    "parallelSequenceUnit should traverse a list of Task and return IO[Unit] in parallel" in {
 
       val mutableStringList = mutable.ListBuffer.empty[String]
-      def createTask(msg: String, delayInMills: Int) = Task.delay {
+      def createTask(msg: String, delayInMills: Int) = IO {
         Thread.sleep(delayInMills)
         mutableStringList.append(msg)
       }
@@ -52,8 +52,8 @@ class TaskSyntaxTest extends StandardSpec with AfterAll {
       mutableStringList mustEqual List("task-2", "task-1", "task-3")
     }
 
-    "parallelSequenceUnit should return Task[Unit] if given an empty List[Task[_]]" in {
-      parallelSequenceUnit(List.empty[Task[Unit]]) must beSucceedingTask(())
+    "parallelSequenceUnit should return IO[Unit] if given an empty List[IO[_]]" in {
+      parallelSequenceUnit(List.empty[IO[Unit]]) must beSucceedingTask(())
     }
   }
 

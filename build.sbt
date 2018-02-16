@@ -2,18 +2,18 @@ name := "TaskForce"
 
 version := "1.0"
 
-scalaVersion := "2.12.3"
+scalaVersion := "2.12.4"
 
-val catsVersion = "0.9.0"
+val catsVersion = "1.0.1"
 val scalacheckVersion = "1.13.5"
 val scalacheckCatsVersion = "0.3.3"
 val specs2Version = "3.9.2"
-val fs2Version = "0.9.7"
-val fs2CatsVersion = "0.4.0"
+val fs2Version = "0.10.0-M11"
+val fs2CatsVersion = "0.5.0"
 val slf4jVersion = "1.7.21"
 val configVersion = "1.1.0"
 val enumeratumVersion = "1.5.12"
-val doobieVersion = "0.4.1"
+val doobieVersion = "0.4.4"
 val cronUtilsVersion = "5.0.5"
 
 val flyway = Seq("org.flywaydb" % "flyway-core" % "4.0.3")
@@ -24,7 +24,10 @@ val doobie = Seq(
   "org.tpolecat" %% "doobie-hikari-cats" % doobieVersion
 )
 
-val cats = Seq("org.typelevel" %% "cats" % catsVersion)
+val cats = Seq(
+  "org.typelevel" %% "cats-core" % catsVersion,
+  "org.typelevel" %% "cats-effect" % "0.5"
+)
 
 val configLib = Seq("com.ccadllc.cedi" %% "config" % configVersion)
 
@@ -73,6 +76,7 @@ val deps =
 lazy val root = (project in file("."))
   .enablePlugins(JavaAppPackaging, GitVersioning)
   .settings(
-    scalaVersion := "2.12.2",
-    libraryDependencies ++= deps
+    scalaVersion := "2.12.4",
+    libraryDependencies ++= deps,
+    scalacOptions += "-Ypartial-unification"
   )

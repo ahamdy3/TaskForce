@@ -1,8 +1,8 @@
 package io.ahamdy.taskforce.scheduling
 
-import fs2.Task
+import cats.effect.IO
 import io.ahamdy.taskforce.domain.ScheduledJob
 
 trait JobsScheduleProvider {
-  def getJobsSchedule: Task[List[ScheduledJob]]
+  def getJobsSchedule: IO[List[ScheduledJob]]
 }

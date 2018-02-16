@@ -7,25 +7,25 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import io.ahamdy.taskforce.syntax.zonedDateTime._
 import cats.syntax.flatMap._
 import fs2.interop.cats._
-import fs2.Task
+import cats.effect.IO
 
 import scala.concurrent.duration.FiniteDuration
 
-class CachedValue[A](source: Task[A], ttl: FiniteDuration, time: Time) {
-  val currentValue = new AtomicReference[Task[A]]()
+class CachedValue[A](source: IO[A], ttl: FiniteDuration, time: Time) {
+  val currentValue = new AtomicReference[IO[A]]()
   val lastUpdated = new AtomicReference[ZonedDateTime](time.epoch)
   val lock = new ReentrantReadWriteLock()
 
-  def value: Task[A] =
+  def value: IO[A] =
     time.now.flatMap{ now =>
       if (lastUpdated.get().isBefore(now.minus(ttl))){
         try{
           lock.writeLock().lock()
           source.unsafeRunSync() match {
-            case Right(a) =>
-              Task.delay(lastUpdated.set(now)) >>
-                Task.delay {
-                  currentValue.set(Task.now(a))
+            case Right(a: A) =>
+              IO(lastUpdated.set(now)) >>
+                IO {
+                  currentValue.set(IO.pure(a))
                   a
                 }
             case Left(_) => source

@@ -2,7 +2,7 @@ package io.ahamdy.taskforce.scheduling
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import fs2.Task
+import cats.effect.IO
 import io.ahamdy.taskforce.testing.StandardSpec
 import org.specs2.specification.AfterAll
 
@@ -16,7 +16,7 @@ class SchedulerImplTest extends StandardSpec with AfterAll{
     "run task in repeatedly in provided period" in {
       val counter = new AtomicInteger()
 
-      val task = Task.delay(counter.incrementAndGet()).map(_ => ())
+      val task = IO(counter.incrementAndGet()).map(_ => ())
 
       scheduler.unsafeSchedule(1.millis, task, _ => ())
 

@@ -3,7 +3,7 @@ package io.ahamdy.taskforce.common
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicInteger
 
-import fs2.Task
+import cats.effect.IO
 import io.ahamdy.taskforce.testing.StandardSpec
 
 import scala.concurrent.duration._
@@ -15,7 +15,7 @@ class CachedValueTest extends StandardSpec {
       val now = ZonedDateTime.now()
       val dummyTime = new DummyTime(now)
       val accessCounter = new AtomicInteger()
-      val source = Task.delay(accessCounter.incrementAndGet())
+      val source = IO(accessCounter.incrementAndGet())
 
       val cachedValue = new CachedValue(source, 1.minute, dummyTime)
 

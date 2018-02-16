@@ -1,8 +1,8 @@
 package io.ahamdy.taskforce.api
 
-import fs2.Task
+import cats.effect.IO
 import io.ahamdy.taskforce.domain.QueuedJob
 
 trait Worker {
-  def queueJob(queuedJob: QueuedJob): Task[Boolean]
+  def queueJob(queuedJob: QueuedJob): IO[Boolean]
 }
