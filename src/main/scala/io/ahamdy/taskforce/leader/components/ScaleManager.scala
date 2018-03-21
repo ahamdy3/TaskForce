@@ -5,12 +5,11 @@ import java.util.concurrent.atomic.AtomicReference
 
 import cats.syntax.flatMap._
 import cats.effect.IO
-import fs2.interop.cats._
 import io.ahamdy.taskforce.api.{CloudManager, NodeInfoProvider}
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain.{NodeActive, NodeId}
 import io.ahamdy.taskforce.store.NodeStore
-import io.ahamdy.taskforce.syntax.IO._
+import io.ahamdy.taskforce.syntax.IOType._
 import io.ahamdy.taskforce.syntax.zonedDateTime._
 
 import scala.concurrent.duration.FiniteDuration

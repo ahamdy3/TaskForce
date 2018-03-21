@@ -19,15 +19,15 @@ class CachedValueTest extends StandardSpec {
 
       val cachedValue = new CachedValue(source, 1.minute, dummyTime)
 
-      cachedValue.value must beSucceedingTask(1)
+      cachedValue.value must beSucceedingIO(1)
       dummyTime.currentTime.set(now.plusSeconds(10))
-      cachedValue.value must beSucceedingTask(1)
+      cachedValue.value must beSucceedingIO(1)
       dummyTime.currentTime.set(now.plusMinutes(1).plusSeconds(1))
-      cachedValue.value must beSucceedingTask(2)
+      cachedValue.value must beSucceedingIO(2)
       dummyTime.currentTime.set(now.plusMinutes(1).plusSeconds(10))
-      cachedValue.value must beSucceedingTask(2)
+      cachedValue.value must beSucceedingIO(2)
       dummyTime.currentTime.set(now.plusMinutes(2).plusSeconds(10))
-      cachedValue.value must beSucceedingTask(3)
+      cachedValue.value must beSucceedingIO(3)
     }
 
   }

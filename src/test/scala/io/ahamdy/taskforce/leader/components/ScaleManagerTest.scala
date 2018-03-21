@@ -37,7 +37,7 @@ class ScaleManagerTest extends StandardSpec {
         scaleManager.scaleUpNeededSince.get must beNone
         cloudManager.nodesCounter.get mustEqual 2
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         scaleManager.scaleUpNeededSince.get must beSome(time.unsafeNow())
         cloudManager.nodesCounter.get mustEqual 2
@@ -49,7 +49,7 @@ class ScaleManagerTest extends StandardSpec {
         val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time)
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         val scaleUpNeededSince = time.unsafeNow()
         scaleManager.scaleUpNeededSince.get must beSome(scaleUpNeededSince)
@@ -58,7 +58,7 @@ class ScaleManagerTest extends StandardSpec {
 
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod).minus(1.second))
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         scaleManager.scaleUpNeededSince.get must beSome(scaleUpNeededSince)
         scaleManager.lastScaleActivity.get mustEqual time.epoch
@@ -71,7 +71,7 @@ class ScaleManagerTest extends StandardSpec {
         val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
         val scaleManager = new ScaleManagerImpl(config.copy(maxNodes = 2), cloudManager, nodeInfoProvider, nodeStore, time)
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         val scaleUpNeededSince = time.unsafeNow()
         scaleManager.scaleUpNeededSince.get must beSome(scaleUpNeededSince)
@@ -80,7 +80,7 @@ class ScaleManagerTest extends StandardSpec {
 
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod))
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         scaleManager.scaleUpNeededSince.get must beSome(scaleUpNeededSince)
         scaleManager.lastScaleActivity.get mustEqual time.epoch
@@ -93,11 +93,11 @@ class ScaleManagerTest extends StandardSpec {
         val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time)
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod))
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         scaleManager.scaleUpNeededSince.get must beNone
         scaleManager.lastScaleActivity.get mustEqual time.unsafeNow()
@@ -111,9 +111,9 @@ class ScaleManagerTest extends StandardSpec {
         val scaleConfig = config.copy(maxNodes = 5, scaleUpStep = 4)
         val scaleManager = new ScaleManagerImpl(scaleConfig, cloudManager, nodeInfoProvider, nodeStore, time)
 
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod))
-        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleUpIfDue(time.unsafeNow()) must beSucceedingIO
 
         cloudManager.nodesCounter.get mustEqual scaleConfig.maxNodes
       }
@@ -127,12 +127,12 @@ class ScaleManagerTest extends StandardSpec {
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time)
 
         scaleManager.scaleDownNeededSince.get must beNone
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(2)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(2)
 
-        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingIO
 
         scaleManager.scaleDownNeededSince.get must beSome(time.unsafeNow())
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(2)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(2)
         scaleManager.lastScaleActivity.get mustEqual time.epoch
       }
 
@@ -143,17 +143,17 @@ class ScaleManagerTest extends StandardSpec {
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time)
         val scaleDownIfDue = time.unsafeNow()
 
-        scaleManager.scaleDownIfDue(scaleDownIfDue) must beSucceedingTask
+        scaleManager.scaleDownIfDue(scaleDownIfDue) must beSucceedingIO
 
         scaleManager.scaleDownNeededSince.get must beSome(scaleDownIfDue)
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(2)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(2)
 
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod).minus(1.second))
 
-        scaleManager.scaleDownIfDue(scaleDownIfDue) must beSucceedingTask
+        scaleManager.scaleDownIfDue(scaleDownIfDue) must beSucceedingIO
 
         scaleManager.scaleDownNeededSince.get must beSome(scaleDownIfDue)
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(2)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(2)
       }
 
       "do nothing if minNodes has been reached" in {
@@ -162,20 +162,20 @@ class ScaleManagerTest extends StandardSpec {
         val nodeStore = new DummyNodeStore(time, nodeInfoProvider.nodeGroup)
         val scaleManager = new ScaleManagerImpl(config.copy(minNodes = 2), cloudManager, nodeInfoProvider, nodeStore, time)
 
-        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingIO
 
         val scaleDownNeededSince = time.unsafeNow()
         scaleManager.scaleDownNeededSince.get must beSome(scaleDownNeededSince)
         scaleManager.lastScaleActivity.get mustEqual time.epoch
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(2)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(2)
 
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod))
 
-        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingIO
 
         scaleManager.scaleDownNeededSince.get must beSome(scaleDownNeededSince)
         scaleManager.lastScaleActivity.get mustEqual time.epoch
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(2)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(2)
       }
 
       "scale down using scaleDownStep only if evaluationPeriod has been exceeded since scaleUpNeededSince and nodes > minNodes" in {
@@ -188,17 +188,17 @@ class ScaleManagerTest extends StandardSpec {
           JobNode(NodeId("test-node-3"), NodeGroup("test-group"), time.unsafeNow().minusMinutes(1), NodeActive(true), NodeVersion("1.0.0"))))
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time)
 
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(3)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(3)
 
-        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingIO
 
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod))
 
-        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingIO
 
         scaleManager.scaleDownNeededSince.get must beNone
         scaleManager.lastScaleActivity.get mustEqual time.unsafeNow()
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(3 - config.scaleDownStep)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(3 - config.scaleDownStep)
       }
 
       "scale down cluster using remaining cluster capacity if scaleDownStep > remaining number to reach minNodes" in {
@@ -212,13 +212,13 @@ class ScaleManagerTest extends StandardSpec {
         val scaleConfig = config.copy(minNodes = 2, scaleDownStep = 4)
         val scaleManager = new ScaleManagerImpl(scaleConfig, cloudManager, nodeInfoProvider, nodeStore, time)
 
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(3)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(3)
 
-        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingIO
         time.currentTime.set(time.unsafeNow().plus(config.evaluationPeriod))
-        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingTask
+        scaleManager.scaleDownIfDue(time.unsafeNow()) must beSucceedingIO
 
-        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingTask(scaleConfig.minNodes)
+        nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup) must beSucceedingIO(scaleConfig.minNodes)
       }
     }
 
@@ -236,14 +236,14 @@ class ScaleManagerTest extends StandardSpec {
         }
 
         scaleManager.lastScaleActivity.set(time.unsafeNow())
-        scaleManager.scaleCluster(queuedAndRunningWeights = 90, activeNodesCapacity = 100) must beSucceedingTask // more than 80%
+        scaleManager.scaleCluster(queuedAndRunningWeights = 90, activeNodesCapacity = 100) must beSucceedingIO // more than 80%
 
         scaleManager.scaleUpCounter.get mustEqual 0
         scaleManager.scaleDownCounter.get mustEqual 0
 
         scaleManager.scaleDownNeededSince.set(Some(time.unsafeNow()))
         scaleManager.lastScaleActivity.set(time.unsafeNow().minus(config.coolDownPeriod))
-        scaleManager.scaleCluster(queuedAndRunningWeights = 90, activeNodesCapacity = 100) must beSucceedingTask // more than 80%
+        scaleManager.scaleCluster(queuedAndRunningWeights = 90, activeNodesCapacity = 100) must beSucceedingIO // more than 80%
 
         scaleManager.scaleUpCounter.get mustEqual 1
         scaleManager.scaleDownCounter.get mustEqual 0
@@ -263,14 +263,14 @@ class ScaleManagerTest extends StandardSpec {
         }
 
         scaleManager.lastScaleActivity.set(time.unsafeNow())
-        scaleManager.scaleCluster(queuedAndRunningWeights = 10, activeNodesCapacity = 100) must beSucceedingTask // less than 30%
+        scaleManager.scaleCluster(queuedAndRunningWeights = 10, activeNodesCapacity = 100) must beSucceedingIO // less than 30%
 
         scaleManager.scaleUpCounter.get mustEqual 0
         scaleManager.scaleDownCounter.get mustEqual 0
 
         scaleManager.scaleUpNeededSince.set(Some(time.unsafeNow()))
         scaleManager.lastScaleActivity.set(time.unsafeNow().minus(config.coolDownPeriod))
-        scaleManager.scaleCluster(queuedAndRunningWeights = 10, activeNodesCapacity = 100) must beSucceedingTask // less than 30%
+        scaleManager.scaleCluster(queuedAndRunningWeights = 10, activeNodesCapacity = 100) must beSucceedingIO // less than 30%
 
         scaleManager.scaleUpCounter.get mustEqual 0
         scaleManager.scaleDownCounter.get mustEqual 1
@@ -291,7 +291,7 @@ class ScaleManagerTest extends StandardSpec {
 
         scaleManager.scaleUpNeededSince.set(Some(time.unsafeNow()))
         scaleManager.scaleDownNeededSince.set(Some(time.unsafeNow()))
-        scaleManager.scaleCluster(queuedAndRunningWeights = 40, activeNodesCapacity = 100) must beSucceedingTask // between 30% and 80%
+        scaleManager.scaleCluster(queuedAndRunningWeights = 40, activeNodesCapacity = 100) must beSucceedingIO // between 30% and 80%
 
         scaleManager.scaleUpCounter.get mustEqual 0
         scaleManager.scaleDownCounter.get mustEqual 0
@@ -316,16 +316,16 @@ class ScaleManagerTest extends StandardSpec {
 
         nodeStore.nodesList.set(nodesList)
 
-        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"), NodeId("test-node-3"), NodeId("test-node-4"))) must beSucceedingTask
+        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"), NodeId("test-node-3"), NodeId("test-node-4"))) must beSucceedingIO
         cloudManager.scaledDownNodes.get must beEmpty
 
-        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"), NodeId("test-node-3"))) must beSucceedingTask
+        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"), NodeId("test-node-3"))) must beSucceedingIO
         cloudManager.scaledDownNodes.get mustEqual Set(NodeId("test-node-4"))
 
-        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"))) must beSucceedingTask
+        scaleManager.cleanInactiveNodes(Set(NodeId("test-node-2"))) must beSucceedingIO
         cloudManager.scaledDownNodes.get mustEqual Set(NodeId("test-node-4"), NodeId("test-node-3"))
 
-        scaleManager.cleanInactiveNodes(Set.empty) must beSucceedingTask
+        scaleManager.cleanInactiveNodes(Set.empty) must beSucceedingIO
         cloudManager.scaledDownNodes.get mustEqual Set(NodeId("test-node-4"), NodeId("test-node-3"))
       }
     }

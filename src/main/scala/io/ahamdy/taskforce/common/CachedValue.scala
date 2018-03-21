@@ -6,7 +6,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import io.ahamdy.taskforce.syntax.zonedDateTime._
 import cats.syntax.flatMap._
-import fs2.interop.cats._
 import cats.effect.IO
 
 import scala.concurrent.duration.FiniteDuration

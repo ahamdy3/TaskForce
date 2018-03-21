@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import cats.effect.IO
 import io.ahamdy.taskforce.domain.NodeId
-import io.ahamdy.taskforce.syntax.IO._
+import io.ahamdy.taskforce.syntax.IOType._
 
 class DummyScaleManager extends ScaleManager {
   val lastReportedQueuedAndRunningWeights = new AtomicInteger(0)

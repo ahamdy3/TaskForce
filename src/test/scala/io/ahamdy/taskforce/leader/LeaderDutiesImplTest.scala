@@ -76,8 +76,8 @@ class LeaderDutiesImplTest extends StandardSpec {
       leader.isLeader must beFalse
       nonLeader.isLeader must beFalse
 
-      leader.electClusterLeader must beSucceedingTask
-      nonLeader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
+      nonLeader.electClusterLeader must beSucceedingIO
 
       leader.isLeader must beTrue
       nonLeader.isLeader must beFalse
@@ -96,7 +96,7 @@ class LeaderDutiesImplTest extends StandardSpec {
       jobStore.runningJobStore.put(runningJob.lock, runningJob)
 
       val leader = createNewLeader()
-      leader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
 
       leader.scheduledJobs.get().toSet mustEqual Set(scheduledJob)
       leader.queuedJobs.values().asScala.toSet mustEqual Set(queuedJob)
@@ -119,8 +119,8 @@ class LeaderDutiesImplTest extends StandardSpec {
       leader.isLeader must beFalse
       nonLeader.isLeader must beFalse
 
-      leader.electClusterLeader must beSucceedingTask
-      nonLeader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
+      nonLeader.electClusterLeader must beSucceedingIO
 
       leader.isLeader must beFalse
       nonLeader.isLeader must beFalse
@@ -135,7 +135,7 @@ class LeaderDutiesImplTest extends StandardSpec {
       val leader = createNewLeader()
       val nonLeader = createNewLeader(nodeInfoProvider = node2InfoProvider)
 
-      leader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
 
       leader.queuedJobs.values().asScala must beEmpty
       nonLeader.queuedJobs.values().asScala must beEmpty
@@ -143,8 +143,8 @@ class LeaderDutiesImplTest extends StandardSpec {
       val queuedJob = scheduledJob.toQueuedJob(dummyTime.unsafeNow())
       jobStore.queuedJobStore.put(queuedJob.id, queuedJob)
 
-      leader.refreshQueuedJobs must beSucceedingTask
-      nonLeader.refreshQueuedJobs must beSucceedingTask
+      leader.refreshQueuedJobs must beSucceedingIO
+      nonLeader.refreshQueuedJobs must beSucceedingIO
 
       leader.queuedJobs.values().asScala.toSet mustEqual Set(queuedJob)
       nonLeader.queuedJobs.values().asScala must beEmpty
@@ -160,12 +160,12 @@ class LeaderDutiesImplTest extends StandardSpec {
       val leader = createNewLeader()
       val nonLeader = createNewLeader(nodeInfoProvider = node2InfoProvider)
 
-      leader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
 
       jobsScheduleProvider.scheduledJobs.append(scheduledJob)
 
-      leader.refreshJobsSchedule() must beSucceedingTask
-      nonLeader.refreshJobsSchedule() must beSucceedingTask
+      leader.refreshJobsSchedule() must beSucceedingIO
+      nonLeader.refreshJobsSchedule() must beSucceedingIO
 
       leader.scheduledJobs.get.toSet mustEqual Set(scheduledJob)
       nonLeader.scheduledJobs.get.toSet must beEmpty
@@ -173,13 +173,13 @@ class LeaderDutiesImplTest extends StandardSpec {
       val scheduledJob2 = scheduledJob.copy(id = JobId("job-id-2"))
       jobsScheduleProvider.scheduledJobs.append(scheduledJob2)
 
-      leader.refreshJobsSchedule() must beSucceedingTask
-      nonLeader.refreshJobsSchedule() must beSucceedingTask
+      leader.refreshJobsSchedule() must beSucceedingIO
+      nonLeader.refreshJobsSchedule() must beSucceedingIO
 
       leader.scheduledJobs.get.toSet mustEqual Set(scheduledJob, scheduledJob2)
       nonLeader.scheduledJobs.get.toSet must beEmpty
 
-      nonLeader.refreshJobsSchedule(ignoreLeader = true) must beSucceedingTask
+      nonLeader.refreshJobsSchedule(ignoreLeader = true) must beSucceedingIO
       leader.scheduledJobs.get.toSet mustEqual Set(scheduledJob, scheduledJob2)
     }
   }
@@ -192,20 +192,20 @@ class LeaderDutiesImplTest extends StandardSpec {
 
       val leader = createNewLeader()
 
-      leader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
 
       jobStore.isEmpty must beTrue
       jobsScheduleProvider.scheduledJobs must beEmpty
       leader.queuedJobs.isEmpty must beTrue
 
-      leader.queueScheduledJobs must beSucceedingTask
+      leader.queueScheduledJobs must beSucceedingIO
 
       leader.queuedJobs.isEmpty must beTrue
 
       jobsScheduleProvider.scheduledJobs.append(scheduledJob)
-      leader.refreshJobsSchedule() must beSucceedingTask
+      leader.refreshJobsSchedule() must beSucceedingIO
 
-      leader.queueScheduledJobs must beSucceedingTask
+      leader.queueScheduledJobs must beSucceedingIO
 
       leader.queuedJobs.values().asScala.toList mustEqual List(scheduledJob.toQueuedJob(dummyTime.unsafeNow()))
     }
@@ -234,15 +234,15 @@ class LeaderDutiesImplTest extends StandardSpec {
 
       val leader = createNewLeader()
 
-      leader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
       leader.isLeader must beTrue
-      leader.queueScheduledJobs must beSucceedingTask
+      leader.queueScheduledJobs must beSucceedingIO
 
 
       leader.queuedJobs.values().asScala must containTheSameElementsAs(List(queuedJob1, queuedJob2))
       jobStore.queuedJobStore.values().asScala must containTheSameElementsAs(List(queuedJob1, queuedJob2))
 
-      leader.assignQueuedJobs must beSucceedingTask
+      leader.assignQueuedJobs must beSucceedingIO
 
       leader.queuedJobs.values().asScala must beEmpty
       jobStore.queuedJobStore.values().asScala must beEmpty
@@ -283,11 +283,11 @@ class LeaderDutiesImplTest extends StandardSpec {
     )
 
     val leader = createNewLeader()
-    leader.electClusterLeader must beSucceedingTask
+    leader.electClusterLeader must beSucceedingIO
     leader.isLeader must beTrue
 
-    leader.queueScheduledJobs must beSucceedingTask
-    leader.assignQueuedJobs must beSucceedingTask
+    leader.queueScheduledJobs must beSucceedingIO
+    leader.assignQueuedJobs must beSucceedingIO
 
 
     jobStore.queuedJobStore.values().asScala must containTheSameElementsAs(List(queuedJob2, queuedJob3))
@@ -329,10 +329,10 @@ class LeaderDutiesImplTest extends StandardSpec {
       jobStore.runningJobStore.put(runningJob3.lock, runningJob3)
 
       val leader = createNewLeader()
-      leader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
       leader.isLeader must beTrue
 
-      leader.cleanDeadNodesJobs() must beSucceedingTask
+      leader.cleanDeadNodesJobs() must beSucceedingIO
 
       leader.queuedJobs.isEmpty must beTrue
       jobStore.queuedJobStore.isEmpty must beTrue
@@ -343,7 +343,7 @@ class LeaderDutiesImplTest extends StandardSpec {
       nodeStore.nodesList.set(List(
         JobNode(NodeId("test-node-1"), NodeGroup("test-group-1"), dummyTime.unsafeNow().minusSeconds(2), NodeActive(true), NodeVersion("1.0.0"))))
 
-      leader.cleanDeadNodesJobs() must beSucceedingTask
+      leader.cleanDeadNodesJobs() must beSucceedingIO
 
       val queuedJob2WithAttempt = queuedJob2.copy(attempts = queuedJob2.attempts.incAttempts)
       val finishedJob3 = runningJob3.toFinishedJob(dummyTime.unsafeNow(), JobResult.Failure,
@@ -384,14 +384,14 @@ class LeaderDutiesImplTest extends StandardSpec {
       scaleManager.lastReportedQueuedAndRunningWeights.get mustEqual 0
       scaleManager.lastReportedActiveNodesCapacity.get mustEqual 0
 
-      leader.scaleCluster must beSucceedingTask
+      leader.scaleCluster must beSucceedingIO
       leader.isLeader must beFalse
       scaleManager.lastReportedQueuedAndRunningWeights.get mustEqual 0
       scaleManager.lastReportedActiveNodesCapacity.get mustEqual 0
 
-      leader.electClusterLeader must beSucceedingTask
+      leader.electClusterLeader must beSucceedingIO
       leader.isLeader must beTrue
-      leader.scaleCluster must beSucceedingTask
+      leader.scaleCluster must beSucceedingIO
 
       scaleManager.lastReportedQueuedAndRunningWeights.get mustEqual scheduledJob.weight.value * 3
       scaleManager.lastReportedActiveNodesCapacity.get mustEqual config.maxWeightPerNode * 2

@@ -3,7 +3,6 @@ package io.ahamdy.taskforce.api
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 
 import cats.effect.IO
-import fs2.interop.cats._
 import cats.syntax.flatMap._
 import io.ahamdy.taskforce.domain.NodeId
 

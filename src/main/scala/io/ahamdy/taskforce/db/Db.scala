@@ -1,8 +1,8 @@
 package io.ahamdy.taskforce.db
 
 import javax.sql.DataSource
-import doobie.hikari.hikaritransactor.HikariTransactor
-import doobie.imports._
+import doobie.hikari.HikariTransactor
+import doobie._
 import cats.effect.IO
 import org.flywaydb.core.Flyway
 import org.postgresql.ds.PGSimpleDataSource

@@ -21,11 +21,12 @@ class SchedulerImpl(config: SchedulerConfig) extends Scheduler with Logging {
   implicit val scheduler: fs2.Scheduler = fs2.Scheduler.fromScheduledExecutorService(executor)
 
   override def unsafeSchedule(period: FiniteDuration, task: IO[Unit], resultHandler: (Either[Throwable, Unit]) => Unit): Unit = {
-    val neverFailingTask: IO[Unit] = task.attempt map {
+    /*val neverFailingTask: IO[Unit] = task.attempt map {
       _.leftMap { err => logger.error(s"Unexpected error from a periodic task $err") }
     }
 
-    (Stream.eval(neverFailingTask) ++ Stream.repeatEval(neverFailingTask.schedule(period))).run.unsafeRunAsync(resultHandler)
+    (Stream.eval(neverFailingTask) ++ Stream.repeatEval(neverFailingTask.schedule(period))).run.unsafeRunAsync(resultHandler)*/
+    ???
   }
 
   override def shutdown: Unit =

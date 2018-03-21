@@ -2,38 +2,36 @@ name := "TaskForce"
 
 version := "1.0"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.5"
 
-val catsVersion = "1.0.1"
+val catsVersion = "1.1.0"
 val scalacheckVersion = "1.13.5"
 val scalacheckCatsVersion = "0.3.3"
 val specs2Version = "3.9.2"
-val fs2Version = "0.10.0-M11"
-val fs2CatsVersion = "0.5.0"
+val fs2Version = "0.10.3"
 val slf4jVersion = "1.7.21"
 val configVersion = "1.1.0"
 val enumeratumVersion = "1.5.12"
-val doobieVersion = "0.4.4"
+val doobieVersion = "0.5.1"
 val cronUtilsVersion = "5.0.5"
 
 val flyway = Seq("org.flywaydb" % "flyway-core" % "4.0.3")
 
 val doobie = Seq(
-  "org.tpolecat" %% "doobie-core-cats" % doobieVersion,
-  "org.tpolecat" %% "doobie-postgres-cats" % doobieVersion,
-  "org.tpolecat" %% "doobie-hikari-cats" % doobieVersion
+  "org.tpolecat" %% "doobie-core" % doobieVersion,
+  "org.tpolecat" %% "doobie-postgres" % doobieVersion,
+  "org.tpolecat" %% "doobie-hikari" % doobieVersion
 )
 
 val cats = Seq(
   "org.typelevel" %% "cats-core" % catsVersion,
-  "org.typelevel" %% "cats-effect" % "0.5"
+  "org.typelevel" %% "cats-effect" % "0.10"
 )
 
 val configLib = Seq("com.ccadllc.cedi" %% "config" % configVersion)
 
 val fs2 = Seq(
   "co.fs2" %% "fs2-core" % fs2Version,
-  "co.fs2" %% "fs2-cats" % fs2CatsVersion,
   "co.fs2" %% "fs2-io" % fs2Version
 )
 
@@ -76,7 +74,7 @@ val deps =
 lazy val root = (project in file("."))
   .enablePlugins(JavaAppPackaging, GitVersioning)
   .settings(
-    scalaVersion := "2.12.4",
+    scalaVersion := "2.12.5",
     libraryDependencies ++= deps,
     scalacOptions += "-Ypartial-unification"
   )

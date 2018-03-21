@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.syntax.flatMap._
 import cats.effect.IO
-import fs2.interop.cats._
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain._
 
@@ -33,7 +32,7 @@ class DummyJobStore(time: Time) extends JobStore {
     if (Option(runningJobStore.putIfAbsent(runningJob.lock, runningJob)).isEmpty)
       IO(queuedJobStore.remove(runningJob.id)).map(_ => ())
     else
-      Task.fail(new Exception("failed to move queued job to running job"))
+      IO.raiseError(new Exception("failed to move queued job to running job"))
 
   override def getRunningJobs: IO[List[RunningJob]] =
     IO(runningJobStore.values().asScala.toList)

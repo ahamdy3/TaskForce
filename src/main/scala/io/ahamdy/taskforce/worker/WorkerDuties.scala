@@ -10,7 +10,7 @@ import io.ahamdy.taskforce.common.Logging
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain._
 import io.ahamdy.taskforce.store.{JobStore, NodeStore}
-import io.ahamdy.taskforce.syntax.IO._
+import io.ahamdy.taskforce.syntax.IOType._
 
 trait WorkerDuties extends Worker {
   def localRunningJobs: ConcurrentHashMap[JobId, RunningJob]
