@@ -2,13 +2,13 @@ name := "TaskForce"
 
 version := "1.0"
 
-scalaVersion := "2.12.5"
+scalaVersion := "2.12.4"
 
 val catsVersion = "1.1.0"
+val monixVersion = "3.0.0-RC1"
 val scalacheckVersion = "1.13.5"
 val scalacheckCatsVersion = "0.3.3"
 val specs2Version = "3.9.2"
-val fs2Version = "0.10.3"
 val slf4jVersion = "1.7.21"
 val configVersion = "1.1.0"
 val enumeratumVersion = "1.5.12"
@@ -24,21 +24,19 @@ val doobie = Seq(
 )
 
 val cats = Seq(
-  "org.typelevel" %% "cats-core" % catsVersion,
-  "org.typelevel" %% "cats-effect" % "0.10"
+  "org.typelevel" %% "cats-core" % catsVersion
+)
+
+val monix = Seq(
+  "io.monix" %% "monix" % monixVersion
 )
 
 val configLib = Seq("com.ccadllc.cedi" %% "config" % configVersion)
 
-val fs2 = Seq(
-  "co.fs2" %% "fs2-core" % fs2Version,
-  "co.fs2" %% "fs2-io" % fs2Version
-)
-
 val logging = Seq(
   "org.slf4j" % "slf4j-api" % "1.7.25",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0"
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0"
 )
 
 val enumeratum = Seq("com.beachape" %% "enumeratum" % enumeratumVersion)
@@ -64,8 +62,8 @@ val deps =
     scalaCheck ++
     enumeratum ++
     cats ++
+    monix ++
     // circe ++
-    fs2 ++
     specs2 ++
     cronUtils ++
     logging ++
@@ -74,7 +72,7 @@ val deps =
 lazy val root = (project in file("."))
   .enablePlugins(JavaAppPackaging, GitVersioning)
   .settings(
-    scalaVersion := "2.12.5",
+    scalaVersion := "2.12.4",
     libraryDependencies ++= deps,
     scalacOptions += "-Ypartial-unification"
   )

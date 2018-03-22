@@ -2,7 +2,7 @@ package io.ahamdy.taskforce.worker
 
 import java.time.ZonedDateTime
 
-import cats.effect.IO
+import monix.eval.Task
 import io.ahamdy.taskforce.api.{DummyNodeInfoProvider, Worker}
 import io.ahamdy.taskforce.common.DummyTime
 import io.ahamdy.taskforce.domain._
@@ -79,9 +79,9 @@ class WorkerDutiesTest extends StandardSpec {
       val validData = Map("VALID" -> "VALID_DATA")
       val validationFunction = { data: Map[String, String] =>
         if(data.contains("VALID"))
-          IO.pure(data)
+          Task.pure(data)
         else
-          IO.raiseError(new Exception("fake INVALID test exception"))
+          Task.raiseError(new Exception("fake INVALID test exception"))
       }
 
       val jobHandler = new DummyJobHandler(runningJob.jobType, validationFunction)

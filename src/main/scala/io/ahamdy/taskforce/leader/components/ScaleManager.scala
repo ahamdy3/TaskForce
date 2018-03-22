@@ -4,7 +4,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicReference
 
 import cats.syntax.flatMap._
-import cats.effect.IO
+import monix.eval.Task
 import io.ahamdy.taskforce.api.{CloudManager, NodeInfoProvider}
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain.{NodeActive, NodeId}
@@ -15,8 +15,8 @@ import io.ahamdy.taskforce.syntax.zonedDateTime._
 import scala.concurrent.duration.FiniteDuration
 
 trait ScaleManager {
-  def scaleCluster(queuedAndRunningWeights: Int, activeNodesCapacity: Int): IO[Unit]
-  def cleanInactiveNodes(currentNodesRunningJobs: Set[NodeId]): IO[Unit]
+  def scaleCluster(queuedAndRunningWeights: Int, activeNodesCapacity: Int): Task[Unit]
+  def cleanInactiveNodes(currentNodesRunningJobs: Set[NodeId]): Task[Unit]
 }
 
 class ScaleManagerImpl(config: ScaleManagerConfig, cloudManager: CloudManager, nodeInfoProvider: NodeInfoProvider,
@@ -36,24 +36,24 @@ class ScaleManagerImpl(config: ScaleManagerConfig, cloudManager: CloudManager, n
     * @return
     */
 
-  override def scaleCluster(queuedAndRunningWeights: Int, activeNodesCapacity: Int): IO[Unit] = {
+  override def scaleCluster(queuedAndRunningWeights: Int, activeNodesCapacity: Int): Task[Unit] = {
     time.now.flatMap { now =>
       if (now.minus(lastScaleActivity.get()) >= config.coolDownPeriod)
         if ((queuedAndRunningWeights / activeNodesCapacity.toDouble) * 100 > config.scaleUpThreshold)
-          IO(scaleDownNeededSince.set(None)) >> scaleUpIfDue(now)
+          Task(scaleDownNeededSince.set(None)) >> scaleUpIfDue(now)
         else if ((queuedAndRunningWeights / activeNodesCapacity.toDouble) * 100 < config.scaleDownThreshold)
-          IO(scaleUpNeededSince.set(None)) >> scaleDownIfDue(now)
+          Task(scaleUpNeededSince.set(None)) >> scaleDownIfDue(now)
         else
-          IO(scaleUpNeededSince.set(None)) >> IO(scaleDownNeededSince.set(None))
+          Task(scaleUpNeededSince.set(None)) >> Task(scaleDownNeededSince.set(None))
       else
-        IO.unit
+        Task.unit
     }
   }
 
-  override def cleanInactiveNodes(currentNodesRunningJobs: Set[NodeId]): IO[Unit] =
+  override def cleanInactiveNodes(currentNodesRunningJobs: Set[NodeId]): Task[Unit] =
     for {
       inactiveNodes <- nodeStore.getAllInactiveNodesByGroup(nodeInfoProvider.nodeGroup)
-      idleInactiveNodes <- IO.pure(inactiveNodes.map(_.nodeId).filterNot(currentNodesRunningJobs.contains).toSet)
+      idleInactiveNodes <- Task.pure(inactiveNodes.map(_.nodeId).filterNot(currentNodesRunningJobs.contains).toSet)
       _ <- cloudManager.scaleDown(idleInactiveNodes)
     } yield ()
 
@@ -68,23 +68,23 @@ class ScaleManagerImpl(config: ScaleManagerConfig, cloudManager: CloudManager, n
     * @return
     */
 
-  def scaleUpIfDue(now: ZonedDateTime): IO[Unit] =
+  def scaleUpIfDue(now: ZonedDateTime): Task[Unit] =
     scaleUpNeededSince.get() match {
-      case None => IO(scaleUpNeededSince.set(Some(now)))
+      case None => Task(scaleUpNeededSince.set(Some(now)))
       case Some(scaleUpNeededTime) if now.minus(scaleUpNeededTime) >= config.evaluationPeriod =>
         nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup).flatMap {
           case nodesCount if nodesCount < config.maxNodes =>
             cloudManager.scaleUp(Math.min(config.scaleUpStep, config.maxNodes - nodesCount)) >>
-              IO(lastScaleActivity.set(now)) >> IO(scaleUpNeededSince.set(None))
+              Task(lastScaleActivity.set(now)) >> Task(scaleUpNeededSince.set(None))
           case _ =>
-            IO.unit
+            Task.unit
         }
-      case Some(_) => IO.unit
+      case Some(_) => Task.unit
     }
 
-  def scaleDownIfDue(now: ZonedDateTime): IO[Unit] =
+  def scaleDownIfDue(now: ZonedDateTime): Task[Unit] =
     scaleDownNeededSince.get match {
-      case None => IO(scaleDownNeededSince.set(Some(now)))
+      case None => Task(scaleDownNeededSince.set(Some(now)))
       case Some(scaleDownNeededTime) if now.minus(scaleDownNeededTime) >= config.evaluationPeriod =>
         nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup).flatMap {
           case nodesCount if nodesCount > config.minNodes =>
@@ -92,11 +92,11 @@ class ScaleManagerImpl(config: ScaleManagerConfig, cloudManager: CloudManager, n
               nodes <- nodeStore.getYoungestActiveNodesByGroup(nodeInfoProvider.nodeGroup, Math.min(config.scaleDownStep, nodesCount - config.minNodes))
               _ <- sequenceUnit(nodes.map(node => nodeStore.updateNodeStatus(node.nodeId, NodeActive(false))))
             } yield ()) >>
-              IO(lastScaleActivity.set(now)) >>
-              IO(scaleDownNeededSince.set(None))
-          case _ => IO.unit
+              Task(lastScaleActivity.set(now)) >>
+              Task(scaleDownNeededSince.set(None))
+          case _ => Task.unit
         }
-      case Some(_) => IO.unit
+      case Some(_) => Task.unit
     }
 }
 

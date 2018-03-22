@@ -2,7 +2,7 @@ package io.ahamdy.taskforce.store
 
 import java.util.concurrent.atomic.AtomicReference
 
-import cats.effect.IO
+import monix.eval.Task
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain._
 
@@ -13,10 +13,10 @@ class DummyNodeStore(time: Time, defaultGroup: NodeGroup = NodeGroup("test-group
     JobNode(NodeId("test-node-3"), NodeGroup("test-group-2"), time.unsafeNow().minusMinutes(1), NodeActive(true), NodeVersion("1.0.0")) // other group
   ))
 
-  override def getAllNodes: IO[List[JobNode]] = IO(nodesList.get())
+  override def getAllNodes: Task[List[JobNode]] = Task(nodesList.get())
 
-  override def updateGroupNodesStatus(nodeGroup: NodeGroup, active: NodeActive): IO[Unit] =
-    IO {
+  override def updateGroupNodesStatus(nodeGroup: NodeGroup, active: NodeActive): Task[Unit] =
+    Task {
       val updatedList = nodesList.get().map(_.copy(active = NodeActive(false)))
       nodesList.set(updatedList)
     }
@@ -27,7 +27,7 @@ class DummyNodeStore(time: Time, defaultGroup: NodeGroup = NodeGroup("test-group
     JobNode(NodeId("test-node-3"), NodeGroup("test-group-2"), time.unsafeNow().minusMinutes(1), NodeActive(true), NodeVersion("1.0.0")) // other group
   ))
 
-  override def updateNodeStatus(nodeId: NodeId, active: NodeActive): IO[Unit] = IO(nodesList.set(
+  override def updateNodeStatus(nodeId: NodeId, active: NodeActive): Task[Unit] = Task(nodesList.set(
     nodesList.get().map{
       case node if node.nodeId == nodeId => node.copy(active = active)
       case node => node

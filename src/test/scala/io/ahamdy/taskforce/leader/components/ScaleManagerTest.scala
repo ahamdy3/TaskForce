@@ -3,7 +3,7 @@ package io.ahamdy.taskforce.leader.components
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicInteger
 
-import cats.effect.IO
+import monix.eval.Task
 import io.ahamdy.taskforce.api.{DummyCloudManager, DummyNodeInfoProvider}
 import io.ahamdy.taskforce.common.DummyTime
 import io.ahamdy.taskforce.domain._
@@ -231,8 +231,8 @@ class ScaleManagerTest extends StandardSpec {
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time) {
           val scaleUpCounter = new AtomicInteger(0)
           val scaleDownCounter = new AtomicInteger(0)
-          override def scaleUpIfDue(now: ZonedDateTime): IO[Unit] = IO(scaleUpCounter.incrementAndGet())
-          override def scaleDownIfDue(now: ZonedDateTime): IO[Unit] = IO(scaleDownCounter.incrementAndGet())
+          override def scaleUpIfDue(now: ZonedDateTime): Task[Unit] = Task(scaleUpCounter.incrementAndGet())
+          override def scaleDownIfDue(now: ZonedDateTime): Task[Unit] = Task(scaleDownCounter.incrementAndGet())
         }
 
         scaleManager.lastScaleActivity.set(time.unsafeNow())
@@ -258,8 +258,8 @@ class ScaleManagerTest extends StandardSpec {
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time) {
           val scaleUpCounter = new AtomicInteger(0)
           val scaleDownCounter = new AtomicInteger(0)
-          override def scaleUpIfDue(now: ZonedDateTime): IO[Unit] = IO(scaleUpCounter.incrementAndGet())
-          override def scaleDownIfDue(now: ZonedDateTime): IO[Unit] = IO(scaleDownCounter.incrementAndGet())
+          override def scaleUpIfDue(now: ZonedDateTime): Task[Unit] = Task(scaleUpCounter.incrementAndGet())
+          override def scaleDownIfDue(now: ZonedDateTime): Task[Unit] = Task(scaleDownCounter.incrementAndGet())
         }
 
         scaleManager.lastScaleActivity.set(time.unsafeNow())
@@ -285,8 +285,8 @@ class ScaleManagerTest extends StandardSpec {
         val scaleManager = new ScaleManagerImpl(config, cloudManager, nodeInfoProvider, nodeStore, time) {
           val scaleUpCounter = new AtomicInteger(0)
           val scaleDownCounter = new AtomicInteger(0)
-          override def scaleUpIfDue(now: ZonedDateTime): IO[Unit] = IO(scaleUpCounter.incrementAndGet())
-          override def scaleDownIfDue(now: ZonedDateTime): IO[Unit] = IO(scaleDownCounter.incrementAndGet())
+          override def scaleUpIfDue(now: ZonedDateTime): Task[Unit] = Task(scaleUpCounter.incrementAndGet())
+          override def scaleDownIfDue(now: ZonedDateTime): Task[Unit] = Task(scaleDownCounter.incrementAndGet())
         }
 
         scaleManager.scaleUpNeededSince.set(Some(time.unsafeNow()))

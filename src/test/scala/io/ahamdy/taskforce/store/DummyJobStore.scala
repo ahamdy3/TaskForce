@@ -4,7 +4,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.syntax.flatMap._
-import cats.effect.IO
+import monix.eval.Task
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain._
 
@@ -16,36 +16,36 @@ class DummyJobStore(time: Time) extends JobStore {
   val runningJobStore = new ConcurrentHashMap[JobLock, RunningJob]()
   val finishedJobStore = new mutable.ArrayBuffer[FinishedJob]()
 
-  override def getJobLastRunTime(id: JobId): IO[Option[ZonedDateTime]] =
+  override def getJobLastRunTime(id: JobId): Task[Option[ZonedDateTime]] =
     if (queuedJobStore.containsKey(id) || runningJobStore.containsKey(id))
       time.now.map(Some(_))
     else
       finishedJobStore.toList.map(_.finishTime) match {
-        case Nil => IO.pure(None)
-        case times if times.length > 1 => IO(Some(times.maxBy(_.getNano)))
+        case Nil => Task.pure(None)
+        case times if times.length > 1 => Task(Some(times.maxBy(_.getNano)))
       }
 
-  override def getQueuedJobsOrderedByPriorityAndTime: IO[List[QueuedJob]] =
-    IO(queuedJobStore.values().asScala.toList.sortBy(job => (job.priority.value, job.queuingTime.toEpochSecond)))
+  override def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]] =
+    Task(queuedJobStore.values().asScala.toList.sortBy(job => (job.priority.value, job.queuingTime.toEpochSecond)))
 
-  override def moveQueuedJobToRunningJob(runningJob: RunningJob): IO[Unit] =
+  override def moveQueuedJobToRunningJob(runningJob: RunningJob): Task[Unit] =
     if (Option(runningJobStore.putIfAbsent(runningJob.lock, runningJob)).isEmpty)
-      IO(queuedJobStore.remove(runningJob.id)).map(_ => ())
+      Task(queuedJobStore.remove(runningJob.id)).map(_ => ())
     else
-      IO.raiseError(new Exception("failed to move queued job to running job"))
+      Task.raiseError(new Exception("failed to move queued job to running job"))
 
-  override def getRunningJobs: IO[List[RunningJob]] =
-    IO(runningJobStore.values().asScala.toList)
+  override def getRunningJobs: Task[List[RunningJob]] =
+    Task(runningJobStore.values().asScala.toList)
 
-  override def createQueuedJob(queuedJob: QueuedJob): IO[Boolean] =
-    IO(Option(queuedJobStore.putIfAbsent(queuedJob.id, queuedJob)).isEmpty)
+  override def createQueuedJob(queuedJob: QueuedJob): Task[Boolean] =
+    Task(Option(queuedJobStore.putIfAbsent(queuedJob.id, queuedJob)).isEmpty)
 
-  override def getFinishedJobs: IO[List[FinishedJob]] =
-    IO(finishedJobStore.toList)
+  override def getFinishedJobs: Task[List[FinishedJob]] =
+    Task(finishedJobStore.toList)
 
-  override def moveRunningJobToQueuedJob(queuedJob: QueuedJob): IO[Unit] =
-    IO(runningJobStore.remove(queuedJob.lock)) >>
-      IO {
+  override def moveRunningJobToQueuedJob(queuedJob: QueuedJob): Task[Unit] =
+    Task(runningJobStore.remove(queuedJob.lock)) >>
+      Task {
         if (Option(queuedJobStore.putIfAbsent(queuedJob.id, queuedJob)).isEmpty)
           ()
         else
@@ -53,11 +53,11 @@ class DummyJobStore(time: Time) extends JobStore {
       }
 
 
-  override def moveRunningJobToFinishedJob(finishedJob: FinishedJob): IO[Unit] =
-    IO(runningJobStore.remove(finishedJob.lock)) >>
-      IO(finishedJobStore.append(finishedJob))
+  override def moveRunningJobToFinishedJob(finishedJob: FinishedJob): Task[Unit] =
+    Task(runningJobStore.remove(finishedJob.lock)) >>
+      Task(finishedJobStore.append(finishedJob))
 
-  override def getRunningJobsByNodeId(nodeId: NodeId): IO[List[RunningJob]] =
+  override def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]] =
     getRunningJobs.map(_.filter(_.nodeId == nodeId))
 
   def reset(): Unit = {
@@ -68,6 +68,6 @@ class DummyJobStore(time: Time) extends JobStore {
 
   def isEmpty: Boolean = queuedJobStore.isEmpty && runningJobStore.isEmpty && finishedJobStore.isEmpty
 
-  override def getRunningJobsByGroupName(nodeGroup: NodeGroup): IO[List[RunningJob]] =
+  override def getRunningJobsByGroupName(nodeGroup: NodeGroup): Task[List[RunningJob]] =
     getRunningJobs.map(_.filter(job => job.nodeGroup == nodeGroup))
 }

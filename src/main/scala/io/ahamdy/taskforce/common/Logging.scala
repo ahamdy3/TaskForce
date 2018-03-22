@@ -1,22 +1,22 @@
 package io.ahamdy.taskforce.common
 
-import cats.effect.IO
+import monix.eval.Task
 import com.typesafe.scalalogging.StrictLogging
 
 
 trait Logging extends StrictLogging{
-  def logDebug(msg: String): IO[Unit] =
-    IO(logger.debug(msg))
+  def logDebug(msg: => String): Task[Unit] =
+    Task(logger.debug(msg))
 
-  def logError(msg: String): IO[Unit] =
-    IO(logger.error(msg))
+  def logError(msg: => String): Task[Unit] =
+    Task(logger.error(msg))
 
-  def logInfo(msg: String): IO[Unit] =
-    IO(logger.info(msg))
+  def logInfo(msg: => String): Task[Unit] =
+    Task(logger.info(msg))
 
-  def logWarning(msg: String): IO[Unit] =
-    IO(logger.warn(msg))
+  def logWarning(msg: => String): Task[Unit] =
+    Task(logger.warn(msg))
 
-  def logTrace(msg: String): IO[Unit] =
-    IO(logger.trace(msg))
+  def logTrace(msg: => String): Task[Unit] =
+    Task(logger.trace(msg))
 }

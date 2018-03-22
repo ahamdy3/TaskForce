@@ -2,7 +2,7 @@ package io.ahamdy.taskforce.worker
 
 import java.util.concurrent.ConcurrentHashMap
 
-import cats.effect.IO
+import monix.eval.Task
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import io.ahamdy.taskforce.api.{NodeInfoProvider, Worker}
@@ -15,12 +15,12 @@ import io.ahamdy.taskforce.syntax.IOType._
 trait WorkerDuties extends Worker {
   def localRunningJobs: ConcurrentHashMap[JobId, RunningJob]
 
-  def runAssignedJobs: IO[Unit]
+  def runAssignedJobs: Task[Unit]
 
-  /*  def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): IO[Unit]
-    def finishJob(finishedJob: FinishedJob): IO[Unit]*/
+  /*  def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): Task[Unit]
+    def finishJob(finishedJob: FinishedJob): Task[Unit]*/
 
-  // def signalHeartbeat: IO[Unit]
+  // def signalHeartbeat: Task[Unit]
 }
 
 class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoProvider: NodeInfoProvider,
@@ -29,10 +29,10 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoP
 
   val localRunningJobs = new ConcurrentHashMap[JobId, RunningJob]()
 
-  override def queueJob(queuedJob: QueuedJob): IO[Boolean] =
+  override def queueJob(queuedJob: QueuedJob): Task[Boolean] =
     jobStore.createQueuedJob(queuedJob)
 
-  def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): IO[Unit] =
+  def requeueJob(runningJob: RunningJob, resultMessage: Option[JobResultMessage] = None): Task[Unit] =
     if (runningJob.attempts.attempts < runningJob.attempts.maxAttempts.value)
       for {
         now <- time.now
@@ -44,15 +44,15 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoP
         _ <- finishJob(runningJob.toFinishedJob(now, JobResult.Failure, resultMessage))
       } yield ()
 
-  def finishJob(finishedJob: FinishedJob): IO[Unit] =
+  def finishJob(finishedJob: FinishedJob): Task[Unit] =
     jobStore.moveRunningJobToFinishedJob(finishedJob)
 
-  override def runAssignedJobs: IO[Unit] =
+  override def runAssignedJobs: Task[Unit] =
     jobStore.getRunningJobsByNodeId(nodeInfoProvider.nodeId).flatMap { jobs =>
       ??? //parallelSequenceUnit(jobs.map(runAssignedJob))(jobsStrategy)
     }
 
-  def runAssignedJob(runningJob: RunningJob): IO[Unit] =
+  def runAssignedJob(runningJob: RunningJob): Task[Unit] =
     ifNotAlreadyRunning(runningJob.id) {
       jobHandlerRegister.getJobHandler(runningJob.jobType) match {
         case Some(handler) =>
@@ -68,33 +68,33 @@ class WorkerDutiesImpl(config: WorkerDutiesConfig, jobStore: JobStore, nodeInfoP
       }
     }
 
-  def runAssignedJobWithHandler(jobHandler: JobHandler, job: RunningJob): IO[Either[(JobErrorDirective, JobErrorMessage), Unit]] = {
+  def runAssignedJobWithHandler(jobHandler: JobHandler, job: RunningJob): Task[Either[(JobErrorDirective, JobErrorMessage), Unit]] = {
     for {
       validData <- runValidation(jobHandler, job)
       result <- jobHandler.jobHandlerFunction(validData, this).attempt.map(_.leftMap(jobHandler.errorHandler))
     } yield result
   }
 
-  def runValidation(jobHandler: JobHandler, job: RunningJob): IO[Map[String, String]] = {
+  def runValidation(jobHandler: JobHandler, job: RunningJob): Task[Map[String, String]] = {
     jobHandler.validateJobInput(job.data).attempt flatMap {
-      case Right(validData) => IO.pure(validData)
+      case Right(validData) => Task.pure(validData)
       case Left(e: JobDataValidationException) =>
         time.now.flatMap { now =>
           finishJob(job.toFinishedJob(now, JobResult.Failure,
             Some(JobResultMessage(s"Job data validation error: ${e.msg}")))) >>
-            IO.raiseError(e)
+            Task.raiseError(e)
         }
-      case Left(t) => IO.raiseError(t)
+      case Left(t) => Task.raiseError(t)
     }
   }
 
-  def ifNotAlreadyRunning(jobId: JobId)(jobTask: IO[Unit]): IO[Unit] =
+  def ifNotAlreadyRunning(jobId: JobId)(jobTask: Task[Unit]): Task[Unit] =
     if (!localRunningJobs.containsKey(jobId))
       jobTask
     else
-      IO.unit
+      Task.unit
 
-  /*override def signalHeartbeat: IO[Unit] =
+  /*override def signalHeartbeat: Task[Unit] =
     nodeStore.updateHeartbeat(nodeInfoProvider.nodeGroup, nodeInfoProvider.nodeId)*/
 }
 

@@ -1,7 +1,7 @@
 package io.ahamdy.taskforce.worker
 
 import io.ahamdy.taskforce.common.Logging
-import io.ahamdy.taskforce.scheduling.{Scheduler, SchedulerConfig, SchedulerImpl}
+import monix.execution.Scheduler
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -14,13 +14,14 @@ trait WorkerJobs {
 class WorkerJobsImpl(config: WorkerJobsConfig, workerDuties: WorkerDuties) extends WorkerJobs with Logging {
 
   private val cores = Runtime.getRuntime.availableProcessors()
-  override val scheduler: Scheduler = new SchedulerImpl(SchedulerConfig(threadPoolSize = cores * config.threadPerCore))
+  override val scheduler: Scheduler = ??? // new SchedulerImpl(SchedulerConfig(threadPoolSize = cores * config.threadPerCore))
 
   override def start(): Unit = {
-    scheduler.unsafeSchedule(config.runJobsPeriod, workerDuties.runAssignedJobs, resultHandler)
+    /*    scheduler.unsafeSchedule(config.runJobsPeriod, workerDuties.runAssignedJobs, resultHandler)
 
-/*    if(config.nodeStoreHeartbeat)
-      scheduler.unsafeSchedule(config.heartBeatPeriod, workerDuties.signalHeartbeat, resultHandler)*/
+        if(config.nodeStoreHeartbeat)
+          scheduler.unsafeSchedule(config.heartBeatPeriod, workerDuties.signalHeartbeat, resultHandler)*/
+    ???
 
   }
 
@@ -31,7 +32,7 @@ class WorkerJobsImpl(config: WorkerJobsConfig, workerDuties: WorkerDuties) exten
     }
   }
 
-  override def shutdown(): Unit = scheduler.shutdown
+  override def shutdown(): Unit = ??? // scheduler.shutdown
 }
 
 case class WorkerJobsConfig(threadPerCore: Int, runJobsPeriod: FiniteDuration, nodeStoreHeartbeat: Boolean,
