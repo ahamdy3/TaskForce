@@ -15,6 +15,7 @@ class NodeLoadBalancerTest extends StandardSpec {
   def createRunningJob(jobId: String, nodeId: String, weight: Int) = RunningJob(
     JobId(jobId),
     NodeId(nodeId),
+    NodeGroup("test-group-1"),
     JobLock("test-lock-1"),
     JobType("test-type-1"),
     JobWeight(weight),

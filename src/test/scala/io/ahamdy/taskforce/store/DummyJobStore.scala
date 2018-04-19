@@ -4,15 +4,14 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.syntax.flatMap._
-import fs2.Task
-import fs2.interop.cats._
+import monix.eval.Task
 import io.ahamdy.taskforce.common.Time
 import io.ahamdy.taskforce.domain._
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-class DummyJobStore(time: Time) extends JobsStore {
+class DummyJobStore(time: Time) extends JobStore {
   val queuedJobStore = new ConcurrentHashMap[JobId, QueuedJob]()
   val runningJobStore = new ConcurrentHashMap[JobLock, RunningJob]()
   val finishedJobStore = new mutable.ArrayBuffer[FinishedJob]()
@@ -22,31 +21,31 @@ class DummyJobStore(time: Time) extends JobsStore {
       time.now.map(Some(_))
     else
       finishedJobStore.toList.map(_.finishTime) match {
-        case Nil => Task.now(None)
-        case times if times.length > 1 => Task.delay(Some(times.maxBy(_.getNano)))
+        case Nil => Task.pure(None)
+        case times if times.length > 1 => Task(Some(times.maxBy(_.getNano)))
       }
 
   override def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]] =
-    Task.delay(queuedJobStore.values().asScala.toList.sortBy(job => (job.priority.value, job.queuingTime.toEpochSecond)))
+    Task(queuedJobStore.values().asScala.toList.sortBy(job => (job.priority.value, job.queuingTime.toEpochSecond)))
 
   override def moveQueuedJobToRunningJob(runningJob: RunningJob): Task[Unit] =
     if (Option(runningJobStore.putIfAbsent(runningJob.lock, runningJob)).isEmpty)
-      Task.delay(queuedJobStore.remove(runningJob.id)).map(_ => ())
+      Task(queuedJobStore.remove(runningJob.id)).map(_ => ())
     else
-      Task.fail(new Exception("failed to move queued job to running job"))
+      Task.raiseError(new Exception("failed to move queued job to running job"))
 
   override def getRunningJobs: Task[List[RunningJob]] =
-    Task.delay(runningJobStore.values().asScala.toList)
+    Task(runningJobStore.values().asScala.toList)
 
   override def createQueuedJob(queuedJob: QueuedJob): Task[Boolean] =
-    Task.delay(Option(queuedJobStore.putIfAbsent(queuedJob.id, queuedJob)).isEmpty)
+    Task(Option(queuedJobStore.putIfAbsent(queuedJob.id, queuedJob)).isEmpty)
 
   override def getFinishedJobs: Task[List[FinishedJob]] =
-    Task.delay(finishedJobStore.toList)
+    Task(finishedJobStore.toList)
 
   override def moveRunningJobToQueuedJob(queuedJob: QueuedJob): Task[Unit] =
-    Task.delay(runningJobStore.remove(queuedJob.lock)) >>
-      Task.delay {
+    Task(runningJobStore.remove(queuedJob.lock)) >>
+      Task {
         if (Option(queuedJobStore.putIfAbsent(queuedJob.id, queuedJob)).isEmpty)
           ()
         else
@@ -55,8 +54,8 @@ class DummyJobStore(time: Time) extends JobsStore {
 
 
   override def moveRunningJobToFinishedJob(finishedJob: FinishedJob): Task[Unit] =
-    Task.delay(runningJobStore.remove(finishedJob.lock)) >>
-      Task.delay(finishedJobStore.append(finishedJob))
+    Task(runningJobStore.remove(finishedJob.lock)) >>
+      Task(finishedJobStore.append(finishedJob))
 
   override def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]] =
     getRunningJobs.map(_.filter(_.nodeId == nodeId))
@@ -68,4 +67,7 @@ class DummyJobStore(time: Time) extends JobsStore {
   }
 
   def isEmpty: Boolean = queuedJobStore.isEmpty && runningJobStore.isEmpty && finishedJobStore.isEmpty
+
+  override def getRunningJobsByGroupName(nodeGroup: NodeGroup): Task[List[RunningJob]] =
+    getRunningJobs.map(_.filter(job => job.nodeGroup == nodeGroup))
 }

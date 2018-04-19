@@ -19,3 +19,4 @@ Features:
 - Jobs can be divided into parallel distributed smaller jobs
 - Job priority
 - Auto Scaling (using cloud APIs)
+- Graceful shutdown

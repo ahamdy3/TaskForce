@@ -1,6 +1,6 @@
 package io.ahamdy.taskforce.scheduling
 
-import fs2.Task
+import monix.eval.Task
 import io.ahamdy.taskforce.domain.ScheduledJob
 
 trait JobsScheduleProvider {

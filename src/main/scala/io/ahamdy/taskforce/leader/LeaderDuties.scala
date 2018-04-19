@@ -4,17 +4,16 @@ import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
-import fs2.Task
-import fs2.interop.cats._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import io.ahamdy.taskforce.domain._
-import io.ahamdy.taskforce.scheduling.JobsScheduleProvider
-import io.ahamdy.taskforce.shared.NodeInfoProvider
-import io.ahamdy.taskforce.store.{JobsStore, NodeStore}
-import io.ahamdy.taskforce.implicits._
-import io.ahamdy.taskforce.leader.components.{JobDueChecker, NodeLoadBalancer}
+import monix.eval.Task
+import io.ahamdy.taskforce.api.NodeInfoProvider
 import io.ahamdy.taskforce.common.{Logging, Time}
+import io.ahamdy.taskforce.domain._
+import io.ahamdy.taskforce.implicits._
+import io.ahamdy.taskforce.leader.components.{JobDueChecker, NodeLoadBalancer, ScaleManager}
+import io.ahamdy.taskforce.scheduling.JobsScheduleProvider
+import io.ahamdy.taskforce.store.{JobStore, NodeStore}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
@@ -32,7 +31,8 @@ trait LeaderDuties {
 }
 
 class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfoProvider,
-                       jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobsStore, time: Time)
+  jobsScheduleProvider: JobsScheduleProvider, nodeStore: NodeStore, jobsStore: JobStore,
+  scaleManager: ScaleManager, time: Time)
   extends LeaderDuties with Logging {
 
   val startTime: ZonedDateTime = time.unsafeNow()
@@ -57,19 +57,19 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
                 runningJobs.putAll(jobsList.map(job => job.lock -> job).toMap.asJava)) >>
               cleanDeadNodesJobs(ignoreLeader = true) >>
               refreshJobsSchedule(ignoreLeader = true) >>
-              Task.delay(leaderFlag.set(true)) >>
+              Task(leaderFlag.set(true)) >>
               logInfo(s"Node ${node.nodeId} has been elected as a leader")
           case _ => Task.unit
         }
       }
     else
-      nodeStore.getAllNodes.map(_.find(_.nodeId == nodeInfoProvider.nodeId)).flatMap{
+      nodeStore.getAllNodes.map(_.find(_.nodeId == nodeInfoProvider.nodeId)).flatMap {
         case Some(leaderNode) if !leaderNode.active.value => gracefulShutdown.as(())
       }
 
   override def refreshJobsSchedule(ignoreLeader: Boolean = false): Task[Unit] = onlyIfLeader(ignoreLeader) {
     jobsScheduleProvider.getJobsSchedule.flatMap { jobs =>
-      Task.delay(scheduledJobs.lazySet(jobs)) >>
+      Task(scheduledJobs.lazySet(jobs)) >>
         logDebug("jobs schedule has been refreshed")
     }
   }
@@ -86,7 +86,7 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
 
   override def assignQueuedJobs: Task[Unit] = onlyIfLeader {
     queuedJobs.values().asScala.toList.sortBy(job => (job.priority.value, job.id.value))
-      .foldLeft(Task.now(0))(assignJob).as(Task.unit)
+      .foldLeft(Task.pure(0))(assignJob).as(())
   }
 
   def queueScheduledJob(job: ScheduledJob): Task[Unit] =
@@ -95,7 +95,7 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
         jobsStore.getJobLastRunTime(job.id).map(_.getOrElse(ZonedDateTime.ofInstant(Instant.EPOCH, ZoneId.of("UTC")))).flatMap {
           case lastRunTime if JobDueChecker.isDue(job.schedule, now, lastRunTime) =>
             val queuedJob = job.toQueuedJob(now)
-            Task.delay(queuedJobs.putIfAbsent(queuedJob.id, queuedJob)) >>
+            Task(queuedJobs.putIfAbsent(queuedJob.id, queuedJob)) >>
               jobsStore.createQueuedJob(queuedJob).as(())
           case _ => Task.unit
         }
@@ -112,10 +112,10 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
               NodeLoadBalancer.leastLoadedNode(runningJobs.values().asScala.toList, allActiveNodes, queuedJob.versionRule,
                 nodeInfoProvider.nodeId, config.leaderAlsoWorker, counter) match {
                 case Some(nodeLoad) if NodeLoadBalancer.canNodeHandle(nodeLoad.jobsWeight, queuedJob.weight.value, config.maxWeightPerNode) =>
-                  val runningJob = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, now)
+                  val runningJob = queuedJob.toRunningJobAndIncAttempts(nodeLoad.node.nodeId, nodeLoad.node.nodeGroup, now)
                   jobsStore.moveQueuedJobToRunningJob(runningJob) >>
-                    Task.delay(queuedJobs.remove(runningJob.id)) >>
-                    Task.delay(runningJobs.put(runningJob.lock, runningJob)).as(counter)
+                    Task(queuedJobs.remove(runningJob.id)) >>
+                    Task(runningJobs.put(runningJob.lock, runningJob)).as(counter)
                 case Some(nodeLoad) =>
                   logInfo(s"The least loaded node ${nodeLoad.node.nodeId} has already loaded with ${nodeLoad.jobsWeight} so it can't take ${queuedJob.id}")
                     .as(counter + 1)
@@ -135,17 +135,17 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
     if (runningJob.attempts.attempts < runningJob.attempts.maxAttempts.value)
       for {
         now <- time.now
-        queuedJob <- Task.now(runningJob.toQueuedJob(now))
+        queuedJob <- Task.pure(runningJob.toQueuedJob(now))
         _ <- jobsStore.moveRunningJobToQueuedJob(queuedJob)
-        _ <- Task.delay(queuedJobs.put(queuedJob.id, queuedJob))
-        _ <- Task.delay(runningJobs.remove(runningJob.lock))
+        _ <- Task(queuedJobs.put(queuedJob.id, queuedJob))
+        _ <- Task(runningJobs.remove(runningJob.lock))
       } yield ()
     else
       for {
         now <- time.now
         _ <- jobsStore.moveRunningJobToFinishedJob(runningJob.toFinishedJob(now, JobResult.Failure,
           Some(JobResultMessage(s"${runningJob.nodeId} is dead and max attempts has been reached"))))
-        _ <- Task.delay(runningJobs.remove(runningJob.lock))
+        _ <- Task(runningJobs.remove(runningJob.lock))
       } yield ()
 
   def cleanJobs(runningJob: List[RunningJob]): Task[Unit] =
@@ -164,18 +164,26 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
     }
 
   override def scaleCluster: Task[Unit] = onlyIfLeader {
-    ???
+    val queuedJobsWeight = queuedJobs.values().asScala.map(_.weight.value).sum
+    val runningJobsWeight = runningJobs.values().asScala.map(_.weight.value).sum
+
+    nodeStore.getAllActiveNodesCountByGroup(nodeInfoProvider.nodeGroup).flatMap { activeNodesCount =>
+      val currentActiveNodeCapacity = activeNodesCount * config.maxWeightPerNode
+      scaleManager.scaleCluster(queuedJobsWeight + runningJobsWeight, currentActiveNodeCapacity)
+    }
   }
 
   override def gracefulShutdown: Task[Boolean] =
     if (groupActiveFlag.get())
       for {
         _ <- nodeStore.updateGroupNodesStatus(nodeInfoProvider.nodeGroup, NodeActive(false))
-        _ <- Task.delay(groupActiveFlag.set(false))
-        readyToShutdown <- Task.delay(runningJobs.isEmpty)
+        _ <- Task(groupActiveFlag.set(false))
+        readyToShutdown <-
+        if (isLeader) Task(runningJobs.isEmpty)
+        else jobsStore.getRunningJobsByGroupName(nodeInfoProvider.nodeGroup).map(_.isEmpty)
       } yield readyToShutdown
     else
-      Task.delay(runningJobs.isEmpty)
+      Task(runningJobs.isEmpty)
 
   def getDeadRunningJobs(allNodes: Set[NodeId]): List[RunningJob] =
     runningJobs.values().asScala.toList.filterNot(job => allNodes.contains(job.nodeId))
@@ -188,6 +196,6 @@ class LeaderDutiesImpl(config: TaskForceLeaderConfig, nodeInfoProvider: NodeInfo
 }
 
 case class TaskForceLeaderConfig(minActiveNodes: Int,
-                                maxWeightPerNode: Int,
-                                youngestLeaderAge: FiniteDuration,
-                                leaderAlsoWorker: Boolean)
+  maxWeightPerNode: Int,
+  youngestLeaderAge: FiniteDuration,
+  leaderAlsoWorker: Boolean)

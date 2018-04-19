@@ -81,23 +81,23 @@ case class ScheduledJob(id: JobId, lock: JobLock, jobType: JobType, weight: JobW
 case class QueuedJob(id: JobId, lock: JobLock, jobType: JobType, weight: JobWeight, data: Map[String, String],
                      attempts: JobAttempts, priority: JobPriority, queuingTime: ZonedDateTime,
                      parentJob: Option[JobId], versionRule: JobVersionRule) extends JobInstance {
-  def toRunningJobAndIncAttempts(nodeId: NodeId, startTime: ZonedDateTime): RunningJob =
-    RunningJob(id, nodeId, lock, jobType, weight, data, attempts.incAttempts, priority, queuingTime,
+  def toRunningJobAndIncAttempts(nodeId: NodeId, nodeGroup: NodeGroup, startTime: ZonedDateTime): RunningJob =
+    RunningJob(id, nodeId, nodeGroup, lock, jobType, weight, data, attempts.incAttempts, priority, queuingTime,
       startTime, parentJob, versionRule)
 }
 
-case class RunningJob(id: JobId, nodeId: NodeId, lock: JobLock, jobType: JobType, weight: JobWeight,
+case class RunningJob(id: JobId, nodeId: NodeId, nodeGroup: NodeGroup, lock: JobLock, jobType: JobType, weight: JobWeight,
                       data: Map[String, String], attempts: JobAttempts, priority: JobPriority,
                       queuingTime: ZonedDateTime, startTime: ZonedDateTime,
                       parentJob: Option[JobId], versionRule: JobVersionRule) extends JobInstance {
   def toQueuedJob(newQueuingTime: ZonedDateTime): QueuedJob =
     QueuedJob(id, lock, jobType, weight, data, attempts, priority, newQueuingTime, parentJob, versionRule)
   def toFinishedJob(finishTime: ZonedDateTime, result: JobResult, resultMessage: Option[JobResultMessage] = None): FinishedJob =
-    FinishedJob(id, nodeId, lock, jobType, weight, data, attempts, priority, queuingTime,
+    FinishedJob(id, nodeId, nodeGroup: NodeGroup, lock, jobType, weight, data, attempts, priority, queuingTime,
       startTime, finishTime, parentJob, result, resultMessage, versionRule)
 }
 
-case class FinishedJob(id: JobId, nodeId: NodeId, lock: JobLock, jobType: JobType,
+case class FinishedJob(id: JobId, nodeId: NodeId, nodeGroup: NodeGroup, lock: JobLock, jobType: JobType,
                        weight: JobWeight, data: Map[String, String], attempts: JobAttempts, priority: JobPriority,
                        queuingTime: ZonedDateTime, startTime: ZonedDateTime, finishTime: ZonedDateTime,
                        parentJob: Option[JobId], result: JobResult, resultMessage: Option[JobResultMessage],
@@ -108,3 +108,12 @@ case class NodeLoad(node: JobNode, jobsWeight: Int)
 
 case class JobDataValidationException(msg: String) extends Exception(msg)
 case class RegisterError(jobType: JobType, message: String)
+case class JobErrorMessage(value: String) extends AnyVal
+
+sealed trait JobErrorDirective extends EnumEntry with EnumEntry.Lowercase
+object JobErrorDirective extends Enum[JobErrorDirective] {
+  case object Retry extends JobErrorDirective
+  case object Abort extends JobErrorDirective
+
+  val values: immutable.IndexedSeq[JobErrorDirective] = findValues
+}

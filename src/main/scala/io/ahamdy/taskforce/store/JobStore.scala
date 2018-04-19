@@ -2,13 +2,14 @@ package io.ahamdy.taskforce.store
 
 import java.time.ZonedDateTime
 
-import fs2.Task
+import monix.eval.Task
 import io.ahamdy.taskforce.domain._
 
 
-trait JobsStore {
+trait JobStore {
   def getQueuedJobsOrderedByPriorityAndTime: Task[List[QueuedJob]]
   def getRunningJobs: Task[List[RunningJob]]
+  def getRunningJobsByGroupName(nodeGroup: NodeGroup): Task[List[RunningJob]]
   def getRunningJobsByNodeId(nodeId: NodeId): Task[List[RunningJob]]
   def getFinishedJobs: Task[List[FinishedJob]]
 

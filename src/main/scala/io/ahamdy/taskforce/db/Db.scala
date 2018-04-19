@@ -1,9 +1,9 @@
 package io.ahamdy.taskforce.db
 
 import javax.sql.DataSource
-import doobie.hikari.hikaritransactor.HikariTransactor
-import doobie.imports._
-import fs2.Task
+import doobie.hikari.HikariTransactor
+import doobie._
+import monix.eval.Task
 import org.flywaydb.core.Flyway
 import org.postgresql.ds.PGSimpleDataSource
 
@@ -12,8 +12,8 @@ trait Db {
   def runCommand[A](command: ConnectionIO[A]): Task[A]
 }
 
-class DbImpl(transactor: Transactor[IOLite]) extends Db {
-  def runCommand[A](command: ConnectionIO[A]): Task[A] = Task.delay(command.transact(transactor).unsafePerformIO)
+/*class DbImpl(transactor: Transactor[IOLite]) extends Db {
+  def runCommand[A](command: ConnectionIO[A]): Task[A] = Task(command.transact(transactor).unsafePerformIO)
 }
 
 object Db {
@@ -41,7 +41,7 @@ object Db {
     new Flyway() {
       setDataSource(dataSource)
     }.migrate()
-}
+}*/
 
 case class DbConfig(
   hostname: String,

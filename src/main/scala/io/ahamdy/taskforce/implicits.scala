@@ -1,7 +1,7 @@
 package io.ahamdy.taskforce
 
-import io.ahamdy.taskforce.syntax.{TaskSyntax, ZonedDateTimeSyntax}
+import io.ahamdy.taskforce.syntax.{IOSyntax, ZonedDateTimeSyntax}
 
 object implicits
-  extends TaskSyntax
+  extends IOSyntax
     with ZonedDateTimeSyntax

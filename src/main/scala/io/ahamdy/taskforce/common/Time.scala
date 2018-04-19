@@ -2,10 +2,11 @@ package io.ahamdy.taskforce.common
 
 import java.time.{Instant, ZoneId, ZonedDateTime}
 
-import fs2._
+import monix.eval.Task
+
 
 trait Time {
-  def now: Task[ZonedDateTime] = Task.delay(unsafeNow())
+  def now: Task[ZonedDateTime] = Task(unsafeNow())
   def epoch: ZonedDateTime = ZonedDateTime.ofInstant(Instant.EPOCH, ZoneId.of("UTC"))
   def unsafeNow(): ZonedDateTime
 }
